@@ -1,0 +1,159 @@
+# Kubernetes Resource Allocation Settings Experiments
+
+## TODOS
+* [x] variables.tf nutzt container-registry von GS (geändert auf doctl registry)
+* [] variables.tf enthält hartkodierte Credentials (zu einem Template gemacht).
+* [] variables.tf enthält hartkodierte nodes payload und workload Bezeichner oder sowas
+* [x] build_and_push.sh enthält deploy-token für container-registry von GS
+* [x] config/kube-config reusable? (wird nach der Erstellung per doctl von der lokalen kube-config kopiert)
+* [] config/gitlab-config.json referenziert container-registry von GS. (umbenannt und auf docn registry geändert)
+* [] wo kommen die Umgebungsvariablen für die Image-Registry her?
+
+## Requirements
+
+### Development Machine
+The development machine refers to the system used to build our software as Docker images, push them to a container registry, and setting up the kubernetes cluster for testing, deploying our software, and running the experiments.
+
+We use MacOS 15.2 as our operating system.
+To improve reproducibility and minimize software installations, we use the `podman` tool to create a Linux development machine as a container, in our case, we use Ubuntu. This is optional, if your host machine's OS is already Ubuntu, you can follow the instructions right away.
+In this section, we use and therefore present, the instructions for the Ubuntu operating system. If you use a different OS, follow the preferred method of your OS to install the requirements.
+
+Furthermore, we use DigitalOcean as our kubernetes provider for our experiments, thus, our instructions are specific to this provider. Our automated workflow requires the installation of the `doctl` tool.
+If you use a different provider, please perform the necessary actions specific to your provider. 
+
+Because we separate our development machine into two systems (MacOS, Ubuntu), the following subsections describe the respective dependencies to install. If you directly use Ubuntu, skip the MacOS subsection.
+
+#### Dependencies for the Host Machine (MacOS)
+* podman (https://podman-desktop.io/docs/installation/macos-install[instructions])
+* doctl (install and authenticate according to https://docs.digitalocean.com/reference/doctl/how-to/install/[instructions])
+
+#### Dependencies for the Linux Development Machine (Ubuntu)
+
+Initial setup:
+----
+podman image pull ubuntu:24.04
+# First time
+podman run -it --name experiment_runner ubuntu:24.04 bash
+# Subsequent times
+# Obtain container_id using podman container list --all
+./start_podman_container.sh <container_id>
+----
+
+Install the following CLI tools:
+* git
+* terraform
+* doctl 1.120.0 (install and authenticate according to https://docs.digitalocean.com/reference/doctl/how-to/install/[instructions]
+
+----
+# initial setup
+apt-get update && apt-get install -y git wget curl gnupg software-properties-common
+# prepare terraform installation
+wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+# install terraform
+apt update
+apt-get install terraform
+# install doctl
+cd ~
+curl -sL https://github.com/digitalocean/doctl/releases/download/v1.120.0/doctl-1.120.0-linux-amd64.tar.gz | tar -xzv
+mv doctl /usr/local/bin
+
+# authenticate using your personal access token
+doctl auth init --context k8s_experiments
+doctl auth switch --context k8s_experiments
+----
+
+Save your container as a new image so that you only have to perform the aforementioned steps once:
+----
+podman commit <container_id> experiment_runner/ubuntu:24.04
+# clean up the old container so that you can reuse the initial name
+podman container rm experiment_runner
+----
+
+After that, use the following command to run the new image as a container and mount this directoy as a volume so the container can access the terraform scripts.
+----
+podman run --volume "$PWD":/mnt/host -it --name experiment_runner experiment_runner/ubuntu:24.04 bash
+----
+
+## Test System
+. Create a kubernetes cluster with two nodes where each node has the following specs:
+  . 2 vCPUs
+  . 4 GB RAM
+
+### Instructions
+
+To automate the provisioning process, we use the `doctl` tool. Perform the following steps in the experiment_runner.
+
+Automatic:
+----
+./create_k8s_cluster.sh
+----
+
+Manual:
+
+----
+doctl kubernetes cluster create k8s-experiments-cluster --version 1.30.5-do.5 --count 2 --size s-2vcpu-4gb --verbose
+----
+
+Provisioning a cluster may take several minutes until finished. After executing the above command, you should see a similar output as the following:
+
+----
+doctl kubernetes cluster create k8s-experiments-cluster --version 1.30.5-do.5 --count 2 --size s-2vcpu-4gb --verbose
+Notice: Cluster is provisioning, waiting for cluster to be running
+............................................................................................
+Notice: Cluster created, fetching credentials
+Notice: Adding cluster credentials to kubeconfig file found in "/root/.kube/config"
+Notice: Setting current-context to do-nyc1-k8s-experiments-cluster
+ID                                      Name                       Region    Version        Auto Upgrade    Status     Node Pools
+47c9881d-871a-4be6-a466-5458154d7f4d    k8s-experiments-cluster    nyc1      1.30.5-do.5    false           running    k8s-experiments-cluster-default-pool
+----
+
+To improve the performance, we slightly modify the command by specific a computing centre region that is in our country.
+
+----
+doctl kubernetes cluster create k8s-experiments-cluster --region fra1 --version 1.30.5-do.5 --count 2 --size s-2vcpu-4gb --verbose
+----
+
+----
+doctl kubernetes cluster delete k8s-experiments-cluster
+----
+
+After executing the above command, you should see a similar output as the following:
+
+----
+doctl kubernetes cluster delete k8s-experiments-cluster
+❯ Are you sure you want to delete this Kubernetes cluster? yes
+Notice: Cluster deleted, removing credentials
+Notice: Removing cluster credentials from kubeconfig file found in "/root/.kube/config"
+Notice: The removed cluster was set as the current context in kubectl. Run `kubectl config get-contexts` to see a list of other contexts you can use, and `kubectl config set-context` to specify a new one.
+----
+
+### Build Test System
+NOTE: This step needs to be performed once to build and push the docker images. 
+
+Our own software is distributed as docker images. For this to work, we use DigitalOcean's Container Registry. To create a container registry, issue the following command (and specifiy the region as you see fit):
+
+----
+doctl registry create k8s-experiments-registry --region fra1 --subscription-tier starter --verbose
+----
+
+You should see the following output (make note of the endpoint):
+
+----
+doctl registry create k8s-experiments-registry --region fra1 --subscription-tier starter --verbose
+Name                        Endpoint                                              Region slug
+k8s-experiments-registry    registry.digitalocean.com/k8s-experiments-registry    fra1
+----
+
+Use the following commands on your host machine to build our own software using docker and push it to the newly created container registry:
+
+----
+./build_testsystem.sh
+----
+
+## Run Experiment
+
+1. Deploy the test system: execute the following in the Linux Development Machine:
+. cd terraform
+. ./deploy.sh
+2. 

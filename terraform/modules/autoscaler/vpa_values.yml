@@ -1,0 +1,24 @@
+admissionController:
+  nodeSelector:
+    kubernetes.io/hostname: ${node}
+
+updater:
+  nodeSelector:
+    kubernetes.io/hostname: ${node}
+
+crds:
+  nodeSelector:
+    kubernetes.io/hostname: ${node}
+
+recommender:
+  nodeSelector:
+    kubernetes.io/hostname: ${node}
+  extraArgs:
+#    prometheus-address: http://prometheus-server.metric.svc
+#    storage: prometheus
+#    prometheus-cadvisor-job-name: kubelet-cadvisor
+    pod-recommendation-min-memory-mb: 1
+    pod-recommendation-min-cpu-millicores: 0.1
+#    memory-aggregation-interval: "0h0m10s"
+#    memory-aggregation-interval-count: 1
+#    memory-histogram-decay-half-life: "0h0m10s"

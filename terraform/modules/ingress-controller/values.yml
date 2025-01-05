@@ -1,0 +1,17 @@
+controller:
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+
+  metrics:
+    port: 10254
+    portName: metrics
+    # if this port is changed, change healthz-port: in extraArgs: accordingly
+    enabled: true
+
+  config:
+    allow-snippet-annotations: "true"
+    use-forwarded-headers: "true"
+
+  nodeSelector:
+    kubernetes.io/hostname: ${node}

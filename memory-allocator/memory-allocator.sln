@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "memory-allocator", "memory-allocator\memory-allocator.csproj", "{F088129E-8AF3-49B1-A900-78B6F46B5E66}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F088129E-8AF3-49B1-A900-78B6F46B5E66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F088129E-8AF3-49B1-A900-78B6F46B5E66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F088129E-8AF3-49B1-A900-78B6F46B5E66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F088129E-8AF3-49B1-A900-78B6F46B5E66}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

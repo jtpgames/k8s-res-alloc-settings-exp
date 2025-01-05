@@ -1,3 +1,11 @@
+.DS_Store
+
+.idea
+
+# Build files
+[Bb]in/
+[Oo]bj/
+
 # Local .terraform directories
 **/.terraform/*
 

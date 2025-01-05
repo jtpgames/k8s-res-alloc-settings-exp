@@ -1,0 +1,12 @@
+locals {
+  dockerconfig_path = "./config/docker-config.json"
+  image_registry = {
+    url      = "registry.digitalocean.com/k8s-experiments-registry"
+    user     = "<registry_user>"
+    password = "<registry_pw>"
+  }
+  nodes = {
+    payload   = "pool-dtz9lu5rg-bp2c9"
+    workload  = "pool-dtz9lu5rg-bp2cz"
+  }
+}
