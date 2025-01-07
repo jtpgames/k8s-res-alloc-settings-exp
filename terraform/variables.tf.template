@@ -6,7 +6,7 @@ locals {
     password = "<registry_pw>"
   }
   nodes = {
-    payload   = "pool-dtz9lu5rg-bp2c9"
-    workload  = "pool-dtz9lu5rg-bp2cz"
+    tools = "<tools_node>"
+    main  = "<main_node>"
   }
 }

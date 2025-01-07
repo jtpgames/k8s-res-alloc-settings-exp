@@ -2,7 +2,7 @@ module "ingress_controller" {
   source     = "./modules/ingress-controller"
 
   namespace = "ingress-nginx"
-  node = local.nodes.payload
+  node = local.nodes.tools
 }
 
 module "metric" {
@@ -10,7 +10,7 @@ module "metric" {
   depends_on = [module.ingress_controller]
 
   namespace = "metric"
-  node = local.nodes.payload
+  node = local.nodes.tools
   grafana_auth = {
     user = "admin"
     password = "admin"
@@ -22,10 +22,10 @@ module "autoscaler" {
   depends_on = [module.metric]
 
   namespace = "autoscaler"
-  node = local.nodes.payload
+  node = local.nodes.tools
 
   provisioning = {
-    vertical-pod-autoscaler = 1
+    vertical-pod-autoscaler = 0
   }
 }
 
@@ -34,7 +34,7 @@ module "workload" {
   depends_on = [module.metric]
 
   namespace = "workload"
-  node = local.nodes.workload
+  node = local.nodes.main
 
   image_registry = {
     url                      = local.image_registry.url
@@ -44,13 +44,13 @@ module "workload" {
   }
 
   provisioning = {
-    cpu_load_generator                = 0
+    cpu_load_generator                = 1
     cpu_load_generator_workload_one   = 0
     cpu_load_generator_workload_two   = 0
     cpu_load_generator_workload_three = 0
-    memory_allocator                  = 0
+    memory_allocator                  = 1
     memory_allocator_workload_one     = 0
     memory_allocator_workload_two     = 0
-    vpa_memory_allocator              = 1
+    vpa_memory_allocator              = 0
   }
 }

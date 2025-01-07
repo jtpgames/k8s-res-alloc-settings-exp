@@ -46,7 +46,7 @@ resource "kubernetes_deployment_v1" "cpu-load-generator-workload-three" {
           "kubernetes.io/hostname" = var.node
         }
         container {
-          image                      = "${var.image_registry.url}/cpu-load-generator:latest"
+          image                      = "${var.image_registry.url}/experiments:cpu-load-generator"
           image_pull_policy          = "Always"
           name                       = "cpu-load-generator-workload-three"
           stdin                      = false

@@ -46,7 +46,7 @@ resource "kubernetes_deployment_v1" "memory-allocator-workload-one" {
           "kubernetes.io/hostname" = var.node
         }
         container {
-          image                      = "${var.image_registry.url}/memory-allocator:latest"
+          image                      = "${var.image_registry.url}/experiments:memory-allocator"
           image_pull_policy          = "Always"
           name                       = "memory-allocator-workload-one"
           stdin                      = false
