@@ -38,8 +38,6 @@ module "workload" {
 
   image_registry = {
     url                      = local.image_registry.url
-    user                     = local.image_registry.user
-    password                 = local.image_registry.password
     path_to_dockerconfigjson = local.dockerconfig_path
   }
 

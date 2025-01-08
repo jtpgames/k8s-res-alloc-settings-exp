@@ -10,8 +10,6 @@ variable "node" {
 variable "image_registry" {
   type = object({
     url                      = string
-    user                     = string
-    password                 = string
     path_to_dockerconfigjson = string
   })
 }

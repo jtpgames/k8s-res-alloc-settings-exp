@@ -16,11 +16,7 @@ resource "kubernetes_secret_v1" "workload" {
   }
 
   data = {
-    ".dockerconfigjson" = templatefile(var.image_registry.path_to_dockerconfigjson, {
-      GSImageUser = var.image_registry.user,
-      GSImagePW   = var.image_registry.password,
-      Auth        = base64encode("${var.image_registry.user}:${var.image_registry.password}")
-    })
+    ".dockerconfigjson" = file(var.image_registry.path_to_dockerconfigjson)
   }
 
   type = "kubernetes.io/dockerconfigjson"

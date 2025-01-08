@@ -1,17 +1,7 @@
 #!/bin/bash
 
-# Read credentials
-read -p "Enter registry username: " REGISTRY_USER
-read -sp "Enter registry password: " REGISTRY_PW
-echo
-
 # Create new variables.tf with replaced values
 cp -v variables.tf.template variables.tf
-
-# Replace username placeholder
-sed -i.bak "s/<registry_user>/$REGISTRY_USER/g" variables.tf
-# Replace password placeholder
-sed -i.bak "s/<registry_pw>/$REGISTRY_PW/g" variables.tf
 
 # Retrieve worker node names
 
@@ -34,3 +24,11 @@ sed -i.bak "s/<main_node>/$node2/g" variables.tf
 
 # Remove backup file
 rm variables.tf.bak
+
+# Query docker-config using doctl and copy it to the config folder
+doctl registry login
+
+docker_config=$(doctl registry docker-config k8s-experiments)
+echo "$docker_config" > config/docker-config.json
+
+doctl registry logout
