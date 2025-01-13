@@ -13,13 +13,13 @@ for arg in "$@"; do
     fi
 done
 
-#echo "Creating kubernetes cluster"
+echo "Creating kubernetes cluster"
 
-#doctl kubernetes cluster create k8s-experiments-cluster --region fra1 --version 1.30.5-do.5 --count 2 --size s-2vcpu-4gb --verbose
+doctl kubernetes cluster create k8s-experiments-cluster --region fra1 --version 1.30.5-do.5 --count 2 --size s-2vcpu-4gb --verbose
 
-#echo "Kubernetes cluster created, copying kubeconfig to terraform folder"
+echo "Kubernetes cluster created, copying kubeconfig to terraform folder"
 
-#cp -v ~/.kube/config "terraform/config/kube-config"
+cp -v ~/.kube/config "terraform/config/kube-config"
 
 if [ "$skip_query_info" = false ]; then
 
