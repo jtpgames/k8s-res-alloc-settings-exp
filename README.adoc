@@ -74,7 +74,7 @@ podman commit <container_id> experiment_runner/ubuntu:24.04
 podman container rm experiment_runner
 ----
 
-After that, use the following command to run the new image as a container and mount this directoy as a volume so the container can access the terraform scripts.
+After that, use the following command to run the new image as a container and mount this directoy (make sure the current directory when you run the command contains this repository) as a volume so the container can access the terraform scripts.
 ----
 podman run --volume "$PWD":/mnt/host -it --name experiment_runner experiment_runner/ubuntu:24.04 bash
 ----
