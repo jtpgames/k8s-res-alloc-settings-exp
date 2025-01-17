@@ -81,8 +81,8 @@ podman run --volume "$PWD":/mnt/host -it --name experiment_runner experiment_run
 
 ## Test System
 . Create a kubernetes cluster with two nodes where each node has the following specs:
-  . 2 vCPUs
-  . 4 GB RAM
+.. 2 vCPUs
+.. 4 GB RAM
 
 ### Instructions
 
