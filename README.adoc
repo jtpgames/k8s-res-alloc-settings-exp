@@ -2,7 +2,7 @@
 
 ## TODOS
 * [x] variables.tf nutzt container-registry von GS (geändert auf doctl registry)
-* [ ] variables.tf enthält hartkodierte Credentials (zu einem Template gemacht).
+* [x] variables.tf enthält hartkodierte Credentials (zu einem Template gemacht).
 * [x] variables.tf enthält hartkodierte nodes payload und workload Bezeichner. Die werden benutzt, um die Workloads für "Tools" und "Main" auf die Nodes zu fixieren. 
 * [x] build_and_push.sh enthält deploy-token für container-registry von GS
 * [x] config/kube-config reusable? (wird nach der Erstellung per doctl von der lokalen kube-config kopiert)
@@ -10,7 +10,7 @@
 * [x] wo kommen die Umgebungsvariablen für die Image-Registry her? (kommen aus modules/workload/workload.tf)
 * [x] VPA aus dem Deployment entfernen
 * [x] deploy.sh almost works; memory-allocator and cpu-load-generator have ErrImagePull however. Fixed it by retrieving the docker-config from doctl registry docker-config command and copying it. Thus, removed the now obsolete variables, like GSImagePW, ...
-* [ ] Need an automatic way to remove the load balancer that is created by executing terraform. Answer: `terraform destroy` followed by executing doctl kubernetes destroy (see below). Script needs to be called from the linux development machine due to the dependency to terraform.
+* [x] Need an automatic way to remove the load balancer that is created by executing terraform. Answer: `terraform destroy` followed by executing doctl kubernetes destroy (see below). Script needs to be called from the linux development machine due to the dependency to terraform.
 
 ## Requirements
 
@@ -30,9 +30,7 @@ Because we separate our development machine into two systems (MacOS, Ubuntu), th
 * podman (https://podman-desktop.io/docs/installation/macos-install[instructions])
 * doctl (install and authenticate according to https://docs.digitalocean.com/reference/doctl/how-to/install/[instructions])
 
-#### Dependencies for the Linux Development Machine (Ubuntu)
-
-Initial setup:
+Setup Linux Development Machine as a Podman container:
 ----
 podman image pull ubuntu:24.04
 # First time
@@ -41,6 +39,8 @@ podman run -it --name experiment_runner ubuntu:24.04 bash
 # Obtain container_id using podman container list --all
 ./start_podman_container.sh <container_id>
 ----
+
+#### Dependencies for the Linux Development Machine (Ubuntu)
 
 Install the following CLI tools:
 * git
@@ -66,7 +66,7 @@ doctl auth init --context k8s_experiments
 doctl auth switch --context k8s_experiments
 ----
 
-Save your container as a new image so that you only have to perform the aforementioned steps once:
+When your Linux Development machine is a Podman container, save your container as a new image so that you only have to perform the aforementioned steps once:
 ----
 podman commit <container_id> experiment_runner/ubuntu:24.04
 # clean up the old container so that you can reuse the initial name
