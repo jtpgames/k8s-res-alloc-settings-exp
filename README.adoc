@@ -43,6 +43,7 @@ podman run -it --name experiment_runner ubuntu:24.04 bash
 #### Dependencies for the Linux Development Machine (Ubuntu)
 
 Install the following CLI tools:
+
 * git
 * terraform
 * doctl 1.120.0 (install and authenticate according to https://docs.digitalocean.com/reference/doctl/how-to/install/[instructions]
