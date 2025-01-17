@@ -160,7 +160,7 @@ After that, it is necessary to save the credentials to the container registry an
 ./prepare_terraform_scripts.sh
 ----
 
-## Run Experiment
+## Run Experiment (WIP)
 
 1. Deploy the test system: execute the following in the Linux Development Machine:
 . cd terraform
