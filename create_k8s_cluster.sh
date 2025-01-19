@@ -4,13 +4,23 @@ install_metrics_server=false
 skip_query_info=false
 
 for arg in "$@"; do
-    if [ "$arg" = "--install-metrics" ]; then
-        install_metrics=true
-        echo "Will install metrics after creation"
-    elif [ "$arg" = "--skip-query-info" ]; then
-        skip_query_info=true
-        echo "Will skip querying cluster information"
-    fi
+    case "$arg" in
+        --install-metrics|-im)
+            install_metrics=true
+            echo "Will install metrics after creation"
+            ;;
+        --skip-query-info|-sq)
+            skip_query_info=true
+            echo "Will skip querying cluster information"
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Available options:"
+            echo "  --install-metrics, -im    Install metrics after creation"
+            echo "  --skip-query-info, -sq       Skip querying cluster information"
+            exit 1
+            ;;
+    esac
 done
 
 echo "Creating kubernetes cluster"
