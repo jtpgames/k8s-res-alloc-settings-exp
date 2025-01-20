@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Default values
 namespace_arg="-n kube-system"
