@@ -65,6 +65,14 @@ mv doctl /usr/local/bin
 # authenticate using your personal access token
 doctl auth init --context k8s_experiments
 doctl auth switch --context k8s_experiments
+
+# Add Kubernetes apt repository
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+
+# Install kubectl
+apt-get update
+apt-get install -y kubectl
 ----
 
 When your Linux Development machine is a Podman container, save your container as a new image so that you only have to perform the aforementioned steps once:
@@ -162,6 +170,11 @@ After that, it is necessary to save the credentials to the container registry an
 
 ## Run Experiment (WIP)
 
+### Memory Experiment
+
+./run_memory_experiment.sh
+
+1. 
 1. Deploy the test system: execute the following in the Linux Development Machine:
 . cd terraform
 . ./deploy.sh
