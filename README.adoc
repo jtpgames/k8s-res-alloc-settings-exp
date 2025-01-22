@@ -50,7 +50,7 @@ Install the following CLI tools:
 
 ----
 # initial setup
-apt-get update && apt-get install -y git wget curl gnupg software-properties-common bc
+apt-get update && apt-get install -y git wget curl gnupg software-properties-common bc jq
 
 # prepare terraform installation
 wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
