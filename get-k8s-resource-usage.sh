@@ -48,7 +48,7 @@ pods=$(kubectl get pods ${namespace_arg} -o wide --field-selector "spec.nodeName
 
 if [ -z "$pods" ]; then
     echo "No running pods found on node: ${node_selector}" >&2
-    exit 0
+    exit 1
 fi
 
 # Print header
