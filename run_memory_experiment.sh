@@ -5,11 +5,23 @@ allocate_memory() {
     local initial_memory="$2"
     local increment="$3"
     local sleep_duration="$4"
+    local threshold="$5"  # Optional parameter
+
+    printf "allocate_memory: ip=%s mem=%dMiB inc=%dMiB sleep=%ds thresh=%s\n" \
+        "$cluster_public_ip" "$initial_memory" "$increment" "$sleep_duration" "${threshold:-none}" >&2
 
     local total_memory=$initial_memory
     local memory_to_allocate=$increment
 
     while true; do
+        # If threshold is set and total memory exceeds it, set increment to 1
+        if [[ -n "$threshold" ]] && [[ $total_memory -ge $threshold ]]; then
+            memory_to_allocate=1
+            sleep_duration=15
+            # show resource usage of kube-system workloads
+            ./get-k8s-resource-usage.sh >&2
+        fi
+
         # Store the curl response and capture the HTTP code
         local response
         local http_code
@@ -31,6 +43,60 @@ allocate_memory() {
 
     # Return only the final memory allocation
     printf "%d" "$total_memory"
+}
+
+get_resource_usage() {
+    local namespace="$1"
+    local resource_type="$2"
+    local max_attempts=30
+    local attempt=1
+    local sleep_duration=10 # seconds between retries
+
+    # Validate input parameters
+    if [ -z "$namespace" ] || [ -z "$resource_type" ]; then
+        echo "Error: Both namespace and resource type (cpu/memory) are required" >&2
+        return 1
+    fi
+
+    # Validate resource type
+    if [ "$resource_type" != "cpu" ] && [ "$resource_type" != "memory" ]; then
+        echo "Error: Resource type must be either 'cpu' or 'memory'" >&2
+        return 1
+    fi
+
+    local output=""
+    while [ $attempt -le $max_attempts ]; do
+        echo "Attempt $attempt of $max_attempts..." >&2
+
+        # Execute the resource usage script
+        output=$(./get-k8s-resource-usage.sh -n "$namespace")
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to execute get-k8s-resource-usage.sh" >&2
+        else
+            break
+        fi
+
+        # Sleep before the next attempt
+        sleep $sleep_duration
+        attempt=$((attempt + 1))
+    done
+
+    if [ $attempt -ge $max_attempts ]; then
+        echo "Failed after $max_attempts attempts" >&2
+        return 1
+    fi
+
+    # Extract the last line and get the requested value
+    local last_line
+    last_line=$(echo "$output" | tail -n 1)
+    
+    if [ "$resource_type" = "cpu" ]; then
+        # Extract CPU value (second to last column) and remove 'm' suffix
+        echo "$last_line" | awk '{print $(NF-1)}' | tr -d 'm'
+    else
+        # Extract memory value (last column) and remove 'Mi' suffix
+        echo "$last_line" | awk '{print $NF}' | tr -d 'Mi'
+    fi
 }
 
 cd terraform
@@ -73,23 +139,17 @@ echo $cluster_public_ip
 
 # Get initial memory usage of memory-allocator pod
 
-output=$(./get-k8s-resource-usage.sh -n workload)
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to execute get-k8s-resource-usage.sh" >&2
-    exit 1
+# Call the function and store the output
+result=$(get_resource_usage "workload" "memory")
+exit_code=$?
+
+# Check the return code
+if [ $exit_code -ne 0 ]; then
+    echo "Could not get initial memory usage; exit code $exit_code"
+    exit $exit_code
 fi
-echo "Full output:"
-echo "$output"
 
-last_line=$(echo "$output" | tail -n 1)
-cpu_value=$(echo "$last_line" | awk '{print $(NF-1)}' | tr -d 'm')
-memory_value=$(echo "$last_line" | awk '{print $NF}' | tr -d 'Mi')
-
-echo -e "\nExtracted values:"
-echo "CPU: ${cpu_value}m"
-echo "Memory: ${memory_value}Mi"
-
-initial_memory_usage=$memory_value
+initial_memory_usage=$result
 memory_to_allocate=100
 total_memory=$initial_memory_usage
 
@@ -102,27 +162,27 @@ echo "Function returned final memory allocation: ${final_memory}MiB"
 
 # After the pod is evicted, we have to wait a couple of minutes before kubernetes rescheduled the pod
 # ten minutes
-sleep 120
+sleep 10
 
-# TODO Repeatetly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
-# get-k8s-resource-usage.sh -n workload
+# Repeatetly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
+
+result=$(get_resource_usage "workload" "memory")
+exit_code=$?
+
+# Check the return code
+if [ $exit_code -ne 0 ]; then
+    echo "Could not get initial memory usage; exit code $exit_code"
+    exit $exit_code
+fi
 
 final_memory_allocated=$((final_memory - initial_memory_usage))
 
-initial_memory_usage=$final_memory
-memory_to_allocate=1
+initial_memory_usage=$result
 total_memory=$initial_memory_usage
 
 ./get-k8s-resource-usage.sh -n workload
 
-final_memory_allocated=2000
-curl -v -X POST "http://$cluster_public_ip/memory-allocator/?memory=$final_memory_allocated"
-
-sleep 20
-
-./get-k8s-resource-usage.sh -n workload
-
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1")
+final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
 echo "Function returned final memory allocation: ${final_memory}MiB"
 
 # show resource usage of kube-system workloads
