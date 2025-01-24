@@ -62,7 +62,12 @@ while IFS= read -r pod; do
         echo "Warning: Could not get metrics for pod: $pod" >&2
         continue
     fi
- 
+    
+    if [ -z "$pod_usage" ]; then
+        echo "Pod usage is empty, usually this means that the pod is not completely running. Aborting." >&2
+        exit 1
+    fi
+
     # Parse CPU and memory values
     pod_cpu=$(echo "$pod_usage" | awk '{print substr($2, 1, length($2)-1)}')
     pod_memory=$(echo "$pod_usage" | awk '{print $3}')
@@ -79,13 +84,15 @@ while IFS= read -r pod; do
 done <<< "$pods"
 
 # Format total memory to appropriate unit
-if [ "$total_memory" -ge 1024 ]; then
-    total_memory_formatted=$(echo "scale=1; $total_memory/1024" | bc)
-    total_memory_unit="Gi"
-else
-    total_memory_formatted=$total_memory
-    total_memory_unit="Mi"
-fi
+total_memory_formatted=$total_memory
+total_memory_unit="Mi"
+# if [ "$total_memory" -ge 1024 ]; then
+#     total_memory_formatted=$(echo "scale=1; $total_memory/1024" | bc)
+#     total_memory_unit="Gi"
+# else
+#     total_memory_formatted=$total_memory
+#     total_memory_unit="Mi"
+# fi
 
 # Print summary
 printf "\nResource Usage Summary:\n"
