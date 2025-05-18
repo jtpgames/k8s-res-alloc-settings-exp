@@ -1,17 +1,5 @@
 # Kubernetes Resource Allocation Settings Experiments
 
-## TODOS
-* [x] variables.tf nutzt container-registry von GS (geändert auf doctl registry)
-* [x] variables.tf enthält hartkodierte Credentials (zu einem Template gemacht).
-* [x] variables.tf enthält hartkodierte nodes payload und workload Bezeichner. Die werden benutzt, um die Workloads für "Tools" und "Main" auf die Nodes zu fixieren. 
-* [x] build_and_push.sh enthält deploy-token für container-registry von GS
-* [x] config/kube-config reusable? (wird nach der Erstellung per doctl von der lokalen kube-config kopiert)
-* [x] config/gitlab-config.json referenziert container-registry von GS. (umbenannt und auf docn registry geändert)
-* [x] wo kommen die Umgebungsvariablen für die Image-Registry her? (kommen aus modules/workload/workload.tf)
-* [x] VPA aus dem Deployment entfernen
-* [x] deploy.sh almost works; memory-allocator and cpu-load-generator have ErrImagePull however. Fixed it by retrieving the docker-config from doctl registry docker-config command and copying it. Thus, removed the now obsolete variables, like GSImagePW, ...
-* [x] Need an automatic way to remove the load balancer that is created by executing terraform. Answer: `terraform destroy` followed by executing doctl kubernetes destroy (see below). Script needs to be called from the linux development machine due to the dependency to terraform.
-
 ## Requirements
 
 ### Development Machine
