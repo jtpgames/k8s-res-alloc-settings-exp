@@ -43,3 +43,7 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+kubelet_config_node1.txt
+kubelet_config_node2.txt
+nodes_description.txt
