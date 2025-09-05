@@ -19,16 +19,18 @@ node2="${node_array[1]}"
 echo "Worker 1: $node1"
 echo "Worker 2: $node2"
 
-sed -i.bak "s/<tools_node>/$node1/g" variables.tf
-sed -i.bak "s/<main_node>/$node2/g" variables.tf
-
-# Remove backup file
-rm variables.tf.bak
+sed -i "s/<tools_node>/$node1/g" variables.tf
+sed -i "s/<main_node>/$node2/g" variables.tf
 
 # Query docker-config using doctl and copy it to the config folder
 doctl registry login
 
 docker_config=$(doctl registry docker-config k8s-experiments)
+mkdir -p config
 echo "$docker_config" > config/docker-config.json
 
 doctl registry logout
+
+# Query kube-config using doctl and copy it to the default folder (~/.kube/config)
+
+doctl kubernetes cluster kubeconfig save k8s-experiments-cluster

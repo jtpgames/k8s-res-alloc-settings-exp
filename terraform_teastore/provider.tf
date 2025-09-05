@@ -1,10 +1,10 @@
 provider "kubernetes" {
-  config_path = "${path.cwd}/config/kube-config"
+  config_path = "~/.kube/config"
 }
 
 provider "helm" {
   kubernetes {
-    config_path = "${path.cwd}/config/kube-config"
+    config_path = "~/.kube/config"
   }
 }
 
