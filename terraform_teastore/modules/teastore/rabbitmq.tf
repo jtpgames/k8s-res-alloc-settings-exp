@@ -21,7 +21,7 @@ resource "kubernetes_deployment_v1" "rabbitmq" {
     template {
       metadata {
         labels = {
-          app = "registry"
+          app = "rabbitmq"
         }
       }
 
@@ -59,4 +59,39 @@ resource "kubernetes_deployment_v1" "rabbitmq" {
   }
 
   wait_for_rollout = true
+}
+
+resource "kubernetes_service" "rabbitmq" {
+  depends_on = [kubernetes_deployment_v1.rabbitmq]
+
+  metadata {
+    name = "rabbitmq-svc"
+    namespace = local.namespace
+  }
+
+  spec {
+    selector = {
+      app = "rabbitmq"
+    }
+
+    port {
+      name       = "web-ui"
+      port       = 8080
+      target_port = 8080
+    }
+
+    port {
+      name       = "amqp"
+      port       = 5672
+      target_port = 5672
+    }
+
+    port {
+      name       = "management"
+      port       = 15672
+      target_port = 15672
+    }
+
+    type = "ClusterIP"
+  }
 }
