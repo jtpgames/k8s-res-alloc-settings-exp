@@ -21,13 +21,13 @@ module "teastore" {
 }
 
 module "noise-neighbor" {
-  source     = "modules/noise-neighbor"
+  source     = "./modules/noise-neighbor"
   depends_on = [module.teastore]
 
   node = local.nodes.main
 
   image_registry = {
-    url                      = local.image_registry.url
+    url                      = local.image_registry_url
     path_to_dockerconfigjson = local.dockerconfig_path
   }
 
