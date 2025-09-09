@@ -1,17 +1,11 @@
-.DS_Store
-
+# JetrBrains Folder
 .idea
 
-# Build files
-[Bb]in/
-[Oo]bj/
+config/*
 
 # Local .terraform directories
 **/.terraform/*
-
-# .tfstate files
-*.tfstate
-*.tfstate.*
+*.terraform.lock.hcl
 
 # Crash log files
 crash.log
@@ -31,9 +25,6 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
-# Ignore transient lock info files created by terraform apply
-.terraform.tfstate.lock.info
-
 # Include override files you do wish to add to version control using negated pattern
 # !example_override.tf
 
@@ -44,6 +35,4 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-kubelet_config_node1.txt
-kubelet_config_node2.txt
-nodes_description.txt
+variables.tf
