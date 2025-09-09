@@ -1,0 +1,3 @@
+[submodule "locust_scripts"]
+	path = locust_scripts
+	url = https://github.com/jtpgames/Locust_Scripts
