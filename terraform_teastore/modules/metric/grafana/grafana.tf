@@ -30,7 +30,6 @@ resource "kubernetes_ingress_v1" "grafana" {
     annotations = {
       "kubernetes.io/ingress.class"                = "nginx"
       "nginx.ingress.kubernetes.io/use-regex"      = "true"
-      "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
     }
     name      = "grafana"
     namespace = var.namespace
@@ -40,6 +39,7 @@ resource "kubernetes_ingress_v1" "grafana" {
       http {
         path {
           path = "/grafana(/|$)(.*)"
+          path_type = "Prefix"
           backend {
             service {
               name = "grafana"
