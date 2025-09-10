@@ -97,8 +97,6 @@ resource "kubernetes_ingress_v1" "webui" {
   metadata {
     annotations = {
       "kubernetes.io/ingress.class"                  = "nginx"
-#      "nginx.ingress.kubernetes.io/use-regex"        = "true"
-#      "nginx.ingress.kubernetes.io/rewrite-target"   = "/$2"
     }
     labels = {
       "app" = "webui"
