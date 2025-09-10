@@ -1,0 +1,6 @@
+[submodule "locust_scripts"]
+	path = locust_scripts
+	url = https://github.com/jtpgames/Locust_Scripts
+[submodule "RAST-Common-Python"]
+	path = RAST-Common-Python
+	url = https://github.com/jtpgames/RAST-Common-Python.git
