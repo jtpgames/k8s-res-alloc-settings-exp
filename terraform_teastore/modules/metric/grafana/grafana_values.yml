@@ -1,0 +1,70 @@
+testFramework:
+  enabled: false
+
+deploymentStrategy:
+  type: Recreate
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 420Mi
+  requests:
+    cpu: 200m
+    memory: 128Mi
+
+nodeSelector:
+  kubernetes.io/hostname: ${node}
+
+sidecar:
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 50m
+      memory: 50Mi
+
+adminUser: ${user}
+adminPassword: ${password}
+
+# https://grafana.com/docs/grafana/latest/administration/provisioning/
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server
+        editable: true
+        access: proxy
+        isDefault: true
+        basicAuth: false
+      - name: Alertmanager
+        type: alertmanager
+        jsonData:
+          implementation: prometheus
+        url: http://prometheus-alertmanager:9093
+        isDefault: false
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: "default"
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# dashboards
+extraConfigmapMounts:
+${dashboard_config_mounts}
+
+grafana.ini:
+  server:
+    root_url: "%(protocol)s://%(domain)s/grafana"
+    serve_from_sub_path: true

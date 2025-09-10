@@ -4,9 +4,21 @@ module "ingress_controller" {
   node = local.nodes.tools
 }
 
+module "metric" {
+  source     = "./modules/metric"
+  depends_on = [module.ingress_controller]
+
+  node = local.nodes.tools
+
+  grafana_auth = {
+    user = "admin"
+    password = "admin"
+  }
+}
+
 module "teastore" {
   source     = "./modules/teastore"
-  depends_on = [module.ingress_controller]
+  depends_on = [module.metric]
 
   node = local.nodes.main
 
