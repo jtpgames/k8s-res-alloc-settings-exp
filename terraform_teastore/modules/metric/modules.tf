@@ -1,6 +1,6 @@
 module "metric-server" {
   depends_on = [kubernetes_namespace_v1.metric]
-  source     = "metric-server"
+  source     = "./metric-server"
 
   namespace  = local.namespace
   node       = var.node
@@ -8,7 +8,7 @@ module "metric-server" {
 
 module "prometheus" {
   depends_on = [kubernetes_namespace_v1.metric]
-  source     = "prometheus"
+  source     = "./prometheus"
 
   namespace  = local.namespace
   node       = var.node
@@ -16,7 +16,7 @@ module "prometheus" {
 
 module "grafana" {
   depends_on = [kubernetes_namespace_v1.metric]
-  source     = "grafana"
+  source     = "./grafana"
 
   namespace  = local.namespace
   node       = var.node
