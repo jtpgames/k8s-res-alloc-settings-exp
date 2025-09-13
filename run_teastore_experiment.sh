@@ -37,6 +37,30 @@ function create_and_activate_venv_in_current_dir {
   fi
 }
 
+# Parse command line arguments
+skip_warmup=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --skip-warmup)
+      skip_warmup=true
+      shift # past argument
+      ;;
+    -h|--help)
+      echo "Usage: $0 [OPTIONS]"
+      echo "Options:"
+      echo "  --skip-warmup    Skip the warmup phase (set first_iteration to false)"
+      echo "  -h, --help       Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option $1"
+      echo "Use -h or --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
 echo "locust_scripts:"
 cd locust_scripts
 create_and_activate_venv_in_current_dir
@@ -45,28 +69,130 @@ cd ..
 
 echo "All Python virtual environments created and requirements installed."
 
+echo "Creating testbed k8s cluster"
+./create_k8s_cluster.sh
+
+cd terraform_teastore
+
+./prepare_terraform_scripts.sh
+./deploy.sh
+
+cd ..
+
+# Executing TeaStore Load Tests for training data
+
+PROFILES_FULL="low low_2 med high"
+PROFILES_TRAINING="med"
+PROFILES_TO_USE=$PROFILES_TRAINING
+
 # perform a few requests to warm up the service (a real warmup is performed by the load test later,
 # this is just a start,
 # because we observed that sometimes the load balancer of TeaStore gets stuck.
 
-cluster_ip="165.227.247.126"
+cluster_public_ip=$(kubectl get ingress -A -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
-for i in {1..20}
+# Check if the kubectl command failed
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to retrieve cluster IP from kubectl"
+    exit 1
+fi
+
+# Check if IP is empty
+if [ -z "$cluster_public_ip" ]; then
+    echo "Error: No cluster IP found in ingress"
+    exit 1
+fi
+
+echo $cluster_public_ip
+
+# explicitly format the time without colons so that is can be used in bash commands as a valid path without the need to escape the colons
+START_TIME="$(date +"%FT%H%M%S")"
+
+root_folder=$(pwd)
+
+experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*" | sort -V | tail -n1) || [ -z "$experiment_dir" ]
+echo "Using experiment directory: $experiment_dir"
+
+target_directory="$root_folder/$experiment_dir/Training_Data/LoadTester_Logs_${START_TIME}"
+locust_directory="$root_folder/locust_scripts"
+
+mkdir -pv "$target_directory"
+
+set -e  # abort on first error inside this block
+
+echo "Sending curl requests to teastore to warm it up ..."
+for i in {1..5}
 do
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/status"
+  echo "$i/5"
+
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
   sleep 0.1
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/"
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/"
   sleep 0.1
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/login"
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/login"
   sleep 0.1
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/category?category=2&page=1"
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1"
   sleep 0.1
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/product?id=7"
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7"
   sleep 0.1
-  curl "http://$cluster_ip/tools.descartes.teastore.webui/profile"
+  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/profile"
   sleep 0.1
 done
 
-cd locust_scripts
-export KEEP_TEASTORE_LOGS=True
-./start_teastore_loadtest.sh --ip $cluster_ip --no_port
+set +e  # back to normal (script won’t exit on error anymore)
+
+# Set first_iteration based on command line argument
+if [ "$skip_warmup" = true ]; then
+  first_iteration=false
+  echo "Skipping warmup phase (--skip-warmup flag provided)"
+else
+  first_iteration=true
+  echo "Warmup phase will be performed on first iteration"
+fi
+
+for profile in $PROFILES_TO_USE; do
+  echo $profile
+
+  echo "move to locust folder and clean old results"
+  cd "$locust_directory"
+  ./delete_results.sh
+
+  export KEEP_TEASTORE_LOGS=True
+
+  # Perform the warmup phase on the first load test
+  if [ "$first_iteration" = true ]; then
+    echo "Perform warmup phase"
+    export WARMUP_PHASE=True
+    first_iteration=false
+  else
+    export WARMUP_PHASE=False
+  fi
+
+  export LOAD_INTENSITY_PROFILE=$profile
+  ./start_teastore_loadtest.sh --ip $cluster_public_ip --no_port
+
+  mv -v locust_log.log "$target_directory/locust_log_$profile.log"
+
+  # sleep for a few seconds for any residual processing in the TeaStore to finish
+  echo "*** Starting next load test in 10 seconds\n"
+  sleep 10
+
+  echo "move back to root folder"
+  cd "$root_folder"
+
+done
+
+echo "*** All load intensity profiles have been executed\n"
+echo "******* Remember to download the logfiles before exiting *******\n"
+echo "*** Navigate to http://$cluster_public_ip/grafana to download them\n"
+
+# -s: Do not echo input coming from a terminal
+# -n 1: Read one character
+echo "Press any key to continue and delete the testbed k8s cluster..."
+read -s -n 1
+
+cd terraform_teastore
+terraform destroy
+cd ..
+
+./destroy_k8s_cluster.sh
