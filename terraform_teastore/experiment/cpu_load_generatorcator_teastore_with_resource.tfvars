@@ -6,80 +6,80 @@ provisioning_cpu_load_generator = 1
 
 auth_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "731m"
+    memory = "586Mi"
   }
   limits = {
-    memory = ""
+    memory = "586Mi"
   }
 }
 
 db_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "34m"
+    memory = "119Mi"
   }
   limits = {
-    memory = ""
+    memory = "119Mi"
   }
 }
 
 image_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "767m"
+    memory = "864Mi"
   }
   limits = {
-    memory = ""
+    memory = "864Mi"
   }
 }
 
 persistence_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "872m"
+    memory = "769Mi"
   }
   limits = {
-    memory = ""
+    memory = "769Mi"
   }
 }
 
 rabbitmq_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "277m"
+    memory = "427Mi"
   }
   limits = {
-    memory = ""
+    memory = "427Mi"
   }
 }
 
 recommender_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "311m"
+    memory = "535Mi"
   }
   limits = {
-    memory = ""
+    memory = "535Mi"
   }
 }
 
 registry_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "88m"
+    memory = "332Mi"
   }
   limits = {
-    memory = ""
+    memory = "332Mi"
   }
 }
 
 webui_resources = {
   requests = {
-    cpu = ""
-    memory = ""
+    cpu = "1560m"
+    memory = "1141Mi"
   }
   limits = {
-    memory = ""
+    memory = "1141Mi"
   }
 }
