@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e  # abort on first error 
+
 # Create new variables.tf with replaced values
 cp -v variables.tf.template variables.tf
 
