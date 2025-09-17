@@ -74,20 +74,18 @@ echo "Creating testbed k8s cluster"
 
 cd terraform_teastore
 
+set -e  # abort on first error inside this block
 ./prepare_terraform_scripts.sh
 ./deploy.sh
+set +e  # back to normal (script won’t exit on error anymore)
 
 cd ..
 
 # Executing TeaStore Load Tests for training data
 
 PROFILES_FULL="low low_2 med high"
-PROFILES_TRAINING="med"
+PROFILES_TRAINING="med med med"
 PROFILES_TO_USE=$PROFILES_TRAINING
-
-# perform a few requests to warm up the service (a real warmup is performed by the load test later,
-# this is just a start,
-# because we observed that sometimes the load balancer of TeaStore gets stuck.
 
 cluster_public_ip=$(kubectl get ingress -A -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
@@ -117,6 +115,13 @@ target_directory="$root_folder/$experiment_dir/Training_Data/LoadTester_Logs_${S
 locust_directory="$root_folder/locust_scripts"
 
 mkdir -pv "$target_directory"
+
+# perform a few requests to warm up the service (a real warmup is performed by the load test later,
+# this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
+
+curl "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
+sleep 1
+curl "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
 
 set -e  # abort on first error inside this block
 
@@ -183,7 +188,7 @@ for profile in $PROFILES_TO_USE; do
 done
 
 echo "*** All load intensity profiles have been executed\n"
-echo "******* Remember to download the logfiles before exiting *******\n"
+echo "******* Remember to download the recorded resource usages before exiting *******\n"
 echo "*** Navigate to http://$cluster_public_ip/grafana to download them\n"
 
 # -s: Do not echo input coming from a terminal
