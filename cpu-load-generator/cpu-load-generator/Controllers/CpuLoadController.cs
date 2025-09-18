@@ -14,20 +14,25 @@ public class CpuLoadController : ControllerBase
         var cts = new CancellationTokenSource();
         var state = new State(cts, percentage);
 
+        // Start CPU load threads
         for (var i = 0; i < cores; i++)
         {
-            ThreadPool.QueueUserWorkItem(CpuKill, state);
+            var thread = new Thread(() => CpuKill(state))
+            {
+                IsBackground = true,
+                Name = $"CpuLoadThread_{i}"
+            };
+            thread.Start();
         }
-        
-        Thread.Sleep(sleepTime);
-        cts.Cancel();
+
+        // Schedule cancellation after sleepTime seconds
+        _ = Task.Delay(TimeSpan.FromSeconds(sleepTime)).ContinueWith(_ => cts.Cancel());
         
         return new StatusCodeResult((int)HttpStatusCode.OK);
     }
 
-    private static void CpuKill(object stateObj)
+    private static void CpuKill(State state)
     {
-        var state = (State)stateObj;
         var cpuUsage = state.Percentage;
         var cts = state.Cts;
         
