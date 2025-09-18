@@ -3,6 +3,7 @@
 # Default values
 namespace_arg="-n kube-system"
 namespace="kube-system"
+variables_tf_path="terraform_teastore/variables.tf"
 node_selector=""
 total_cpu=0
 total_memory=0
@@ -20,6 +21,15 @@ while [ $# -gt 0 ]; do
             namespace="$2"
             shift 2
             ;;
+        -v|--variables)
+            if [ -z "$2" ]; then
+                echo "Error: Variables argument is missing" >&2
+                echo "Usage: $0 [-v|--variables Path to variables.tf]" >&2
+                exit 1
+            fi
+            variables_tf_path="$2"
+            shift 2
+          ;;
         *)
             echo "Unknown argument: $1" >&2
             echo "Usage: $0 [-n|--namespace NAMESPACE]" >&2
@@ -34,7 +44,7 @@ if ! command -v kubectl >/dev/null 2>&1; then
     exit 1
 fi
 
-node_selector=$(grep 'main.*=' terraform/variables.tf | awk -F'"' '{print $2}')
+node_selector=$(grep 'main.*=' $variables_tf_path | awk -F'"' '{print $2}')
 
 # Check if node_selector is empty or not set
 if [ -z "$node_selector" ]; then
