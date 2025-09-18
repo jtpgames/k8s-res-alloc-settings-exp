@@ -2,6 +2,7 @@
 
 # Initialize variables
 SKIP_MODULES_MODIFICATION=false
+RUN_TWICE=true
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -10,10 +11,14 @@ while [[ $# -gt 0 ]]; do
       SKIP_MODULES_MODIFICATION=true
       shift
       ;;
+    -o|--once)
+      RUN_TWICE=false
+      shift
+      ;;
     *)
       # Unknown option
       echo "Unknown option: $1"
-      echo "Usage: $0 [-s|--skip-modules-modification]"
+      echo "Usage: $0 [-s|--skip-modules-modification] [-o|--once]"
       exit 1
       ;;
   esac
@@ -25,15 +30,22 @@ allocate_memory() {
     local increment="$3"
     local sleep_duration="$4"
     local threshold="$5"  # Optional parameter
+    local max_threshold="$6"  # Optional parameter - breaks loop when reached
 
-    printf "allocate_memory: ip=%s mem=%dMiB inc=%dMiB sleep=%ds thresh=%s\n" \
-        "$cluster_public_ip" "$initial_memory" "$increment" "$sleep_duration" "${threshold:-none}" >&2
+    printf "allocate_memory: ip=%s mem=%dMiB inc=%dMiB sleep=%ds thresh=%s max_thresh=%s\n" \
+        "$cluster_public_ip" "$initial_memory" "$increment" "$sleep_duration" "${threshold:-none}" "${max_threshold:-none}" >&2
 
     local total_memory=$initial_memory
     local memory_to_allocate=$increment
     local threshold_exceeded=false
 
     while true; do
+        # If max_threshold is set and total memory exceeds it, break the loop
+        if [[ -n "$max_threshold" ]] && [[ $total_memory -ge $max_threshold ]]; then
+            printf "Max threshold of %dMiB reached. Current memory: %dMiB. Breaking loop.\n" "$max_threshold" "$total_memory" >&2
+            break
+        fi
+        
         # If threshold is set and total memory exceeds it, set increment to 1
         if [[ -n "$threshold" ]] && [[ $total_memory -ge $threshold ]]; then
             memory_to_allocate=1
@@ -46,7 +58,7 @@ allocate_memory() {
         # Store the curl response and capture the HTTP code
         local response
         local http_code
-        printf "Sending request to allocate %s Mi memory" "$memory_to_allocate" >&2
+        printf "Sending request to allocate %s Mi memory\n" "$memory_to_allocate" >&2
         response=$(curl -v -X POST "http://$cluster_public_ip/memory-allocator/?memory=$memory_to_allocate" -w "%{http_code}" 2>&1)
         http_code=$(echo "$response" | tail -n1)
 
@@ -57,7 +69,7 @@ allocate_memory() {
             if [ "$threshold_exceeded" = "true" ]; then
                 # synchonize total memory usage with metrics server
                 # Get new memory value
-                new_memory=$(try_get_resource_usage "workload" "memory")
+                new_memory=$(try_get_resource_usage "noisy-neighbor" "memory")
 
                 # Update total_memory if new value is greater
                 if [[ -n "$new_memory" ]] && [[ "$new_memory" -gt "$total_memory" ]]; then
@@ -189,7 +201,7 @@ echo "Cluster-IP: $cluster_public_ip"
 
 # Get initial memory usage of memory-allocator pod
 
-result=$(try_get_resource_usage "workload" "memory")
+result=$(try_get_resource_usage "noisy-neighbor" "memory")
 exit_code=$?
 
 # Check the return code
@@ -198,38 +210,42 @@ if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi
 
-./get-k8s-resource-usage.sh -n workload
+./get-k8s-resource-usage.sh -n noisy-neighbor
 
 initial_memory_usage=$result
-memory_to_allocate=100
+memory_to_allocate=500
 total_memory=$initial_memory_usage
 
 # Call the function and capture the result
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1")
+final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "10000")
 echo "First run: final memory allocation: ${final_memory}MiB"
 
-echo "After the pod is evicted, we have to wait until kubernetes reschedules the pod. This can range from a couple of seconds up to ten minutes."
-sleep 10
+if [ "$RUN_TWICE" = true ]; then
+  echo "After the pod is evicted, we have to wait until kubernetes reschedules the pod. This can range from a couple of seconds up to ten minutes."
+  sleep 10
 
-# Repeatetly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
-result=$(try_get_resource_usage "workload" "memory")
-exit_code=$?
+  # Repeatetly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
+  result=$(try_get_resource_usage "noisy-neighbor" "memory")
+  exit_code=$?
 
-# Check the return code
-if [ $exit_code -ne 0 ]; then
+  # Check the return code
+  if [ $exit_code -ne 0 ]; then
     echo "Could not get initial memory usage; exit code $exit_code"
     exit $exit_code
+  fi
+
+  ./get-k8s-resource-usage.sh -n noisy-neighbor
+
+  final_memory_allocated=$((final_memory - initial_memory_usage))
+
+  initial_memory_usage=$result
+  total_memory=$initial_memory_usage
+
+  final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
+  echo "Second run: final memory allocation: ${final_memory}MiB"
 fi
 
-./get-k8s-resource-usage.sh -n workload
-
-final_memory_allocated=$((final_memory - initial_memory_usage))
-
-initial_memory_usage=$result
-total_memory=$initial_memory_usage
-
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
-echo "Second run: final memory allocation: ${final_memory}MiB"
-
-echo "show resource usage of kube-system workloads after experiment."
+echo "show resource usage of workloads after experiment."
 ./get-k8s-resource-usage.sh
+./get-k8s-resource-usage.sh -n noisy-neighbor
+./get-k8s-resource-usage.sh -n teastore
