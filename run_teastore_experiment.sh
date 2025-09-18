@@ -123,6 +123,7 @@ if [ -z "$cluster_public_ip" ]; then
 fi
 
 echo $cluster_public_ip
+echo $cluster_public_ip > "cluster_public_ip.txt"
 
 # explicitly format the time without colons so that is can be used in bash commands as a valid path without the need to escape the colons
 START_TIME="$(date +"%FT%H%M%S")"
