@@ -1,5 +1,5 @@
 locals {
-  namespace = "noise-neighbor"
+  namespace = "noisy-neighbor"
 }
 
 variable "node" {
