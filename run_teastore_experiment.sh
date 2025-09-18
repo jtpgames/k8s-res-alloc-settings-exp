@@ -94,7 +94,8 @@ cd ..
 
 # Executing TeaStore Load Tests for training data
 
-PROFILES_FULL="low low_2 med high"
+# PROFILES_FULL="low low_2 med high"
+PROFILES_FULL="med"
 PROFILES_TRAINING="med med med"
 
 # Set profiles based on experiment type
@@ -181,7 +182,7 @@ fi
 if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
   echo "Starting memory experiment in background..."
   memory_log_file="$memory_noisy_neighbor_experiment_dir/memory_experiment_${START_TIME}.log"
-  ./run_memory_experiment.sh --skip-modules-modification > "$memory_log_file" 2>&1 &
+  ./run_memory_experiment.sh --skip-modules-modification --once > "$memory_log_file" 2>&1 &
   memory_experiment_pid=$!
   echo "Memory experiment started with PID $memory_experiment_pid, logging to $memory_log_file"
 fi
