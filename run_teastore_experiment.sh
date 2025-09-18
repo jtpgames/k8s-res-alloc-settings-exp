@@ -39,6 +39,7 @@ function create_and_activate_venv_in_current_dir {
 
 # Parse command line arguments
 skip_warmup=false
+experiment_type="training"  # default to training
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -46,11 +47,21 @@ while [[ $# -gt 0 ]]; do
       skip_warmup=true
       shift # past argument
       ;;
+    --experiment-type)
+      experiment_type="$2"
+      if [[ "$experiment_type" != "training" && "$experiment_type" != "memory-noisy-neighbor" && "$experiment_type" != "cpu-noisy-neighbor" ]]; then
+        echo "Error: Invalid experiment type '$experiment_type'. Valid types are: training, memory-noisy-neighbor, cpu-noisy-neighbor"
+        exit 1
+      fi
+      shift # past argument
+      shift # past value
+      ;;
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
-      echo "  --skip-warmup    Skip the warmup phase (set first_iteration to false)"
-      echo "  -h, --help       Show this help message"
+      echo "  --skip-warmup              Skip the warmup phase (set first_iteration to false)"
+      echo "  --experiment-type TYPE      Specify experiment type: training (default), memory-noisy-neighbor, cpu-noisy-neighbor"
+      echo "  -h, --help                  Show this help message"
       exit 0
       ;;
     *)
@@ -85,7 +96,16 @@ cd ..
 
 PROFILES_FULL="low low_2 med high"
 PROFILES_TRAINING="med med med"
-PROFILES_TO_USE=$PROFILES_TRAINING
+
+# Set profiles based on experiment type
+if [ "$experiment_type" = "training" ]; then
+  PROFILES_TO_USE=$PROFILES_TRAINING
+else
+  PROFILES_TO_USE=$PROFILES_FULL
+fi
+
+echo "Experiment type: $experiment_type"
+echo "Using profiles: $PROFILES_TO_USE"
 
 cluster_public_ip=$(kubectl get ingress -A -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
@@ -112,9 +132,11 @@ experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*
 echo "Using experiment directory: $experiment_dir"
 
 target_directory="$root_folder/$experiment_dir/Training_Data/LoadTester_Logs_${START_TIME}"
+memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment"
 locust_directory="$root_folder/locust_scripts"
 
 mkdir -pv "$target_directory"
+mkdir -pv "$memory_noisy_neighbor_experiment_dir"
 
 # perform a few requests to warm up the service (a real warmup is performed by the load test later,
 # this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
@@ -153,6 +175,15 @@ if [ "$skip_warmup" = true ]; then
 else
   first_iteration=true
   echo "Warmup phase will be performed on first iteration"
+fi
+
+# Start memory experiment if experiment type is memory-noisy-neighbor
+if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
+  echo "Starting memory experiment in background..."
+  memory_log_file="$memory_noisy_neighbor_experiment_dir/memory_experiment_${START_TIME}.log"
+  ./run_memory_experiment.sh --skip-modules-modification > "$memory_log_file" 2>&1 &
+  memory_experiment_pid=$!
+  echo "Memory experiment started with PID $memory_experiment_pid, logging to $memory_log_file"
 fi
 
 for profile in $PROFILES_TO_USE; do
