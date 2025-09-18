@@ -1,5 +1,24 @@
 #!/bin/bash
 
+# Initialize variables
+SKIP_MODULES_MODIFICATION=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -s|--skip-modules-modification)
+      SKIP_MODULES_MODIFICATION=true
+      shift
+      ;;
+    *)
+      # Unknown option
+      echo "Unknown option: $1"
+      echo "Usage: $0 [-s|--skip-modules-modification]"
+      exit 1
+      ;;
+  esac
+done
+
 allocate_memory() {
     local cluster_public_ip="$1"
     local initial_memory="$2"
@@ -114,37 +133,38 @@ try_get_resource_usage() {
     fi
 }
 
-cd terraform
+if [ "$SKIP_MODULES_MODIFICATION" = false ]; then
+    cd terraform
+    # Check if modules.tf exists
+    if [ ! -f modules.tf ]; then
+        echo "Error: modules.tf file not found"
+        exit 1
+    fi
 
-# Check if modules.tf exists
-if [ ! -f modules.tf ]; then
-    echo "Error: modules.tf file not found"
-    exit 1
-fi
+    # # Create backup with timestamp
+    # BACKUP="modules.tf.backup.$(date +%Y%m%d_%H%M%S)"
+    # if ! cp modules.tf "$BACKUP"; then
+    #     echo "Error: Failed to create backup file"
+    #     exit 1
+    # fi
+    # echo "Backup created: $BACKUP"
 
-# # Create backup with timestamp
-# BACKUP="modules.tf.backup.$(date +%Y%m%d_%H%M%S)"
-# if ! cp modules.tf "$BACKUP"; then
-#     echo "Error: Failed to create backup file"
-#     exit 1
-# fi
-# echo "Backup created: $BACKUP"
+    if sed -i "s/[[:space:]]memory_allocator[[:space:]]*=[[:space:]]*[0-1]/\tmemory_allocator\t=1/" modules.tf && \
+       sed -i "s/cpu_load_generator[[:space:]]*=[[:space:]]*[0-1]/cpu_load_generator = 0/" modules.tf; then
+        echo "Successfully updated memory_allocator to 1 and cpu_load_generator to 0"
+    else
+        echo "Error: Failed to update modules.tf"
+        # Restore from backup
+        # cp "$BACKUP" modules.tf
+        exit 1
+    fi
 
-if sed -i "s/[[:space:]]memory_allocator[[:space:]]*=[[:space:]]*[0-1]/\tmemory_allocator\t=1/" modules.tf && \
-   sed -i "s/cpu_load_generator[[:space:]]*=[[:space:]]*[0-1]/cpu_load_generator = 0/" modules.tf; then
-    echo "Successfully updated memory_allocator to 1 and cpu_load_generator to 0"
+    #./deploy.sh
+    #sleep 5
+    cd ..
 else
-    echo "Error: Failed to update modules.tf"
-    # Restore from backup
-    # cp "$BACKUP" modules.tf
-    exit 1
+    echo "Skipping modules.tf modification as requested"
 fi
-
-#./deploy.sh
-
-cd ..
-
-#sleep 5
 
 echo "show resource usage of kube-system workloads before experiment."
 ./get-k8s-resource-usage.sh
@@ -165,7 +185,7 @@ if [ -z "$cluster_public_ip" ]; then
     exit 1
 fi
 
-echo $cluster_public_ip
+echo "Cluster-IP: $cluster_public_ip"
 
 # Get initial memory usage of memory-allocator pod
 
