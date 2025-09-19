@@ -181,15 +181,7 @@ fi
 echo "show resource usage of kube-system workloads before experiment."
 ./get-k8s-resource-usage.sh
 
-# kubectl get ingress -A -o jsonpath='{range .items[*]}{.metadata.name}: {.status.loadBalancer.ingress[0].ip}{"\n"}{end}'
-
-cluster_public_ip=$(kubectl get ingress -A -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
-
-# Check if the kubectl command failed
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to retrieve cluster IP from kubectl"
-    exit 1
-fi
+cluster_public_ip=$(cat "cluster_public_ip.txt")
 
 # Check if IP is empty
 if [ -z "$cluster_public_ip" ]; then
@@ -217,7 +209,7 @@ memory_to_allocate=500
 total_memory=$initial_memory_usage
 
 # Call the function and capture the result
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "10000")
+final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "14000")
 echo "First run: final memory allocation: ${final_memory}MiB"
 
 if [ "$RUN_TWICE" = true ]; then
@@ -241,7 +233,8 @@ if [ "$RUN_TWICE" = true ]; then
   initial_memory_usage=$result
   total_memory=$initial_memory_usage
 
-  final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
+  # final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
+  final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "14000")
   echo "Second run: final memory allocation: ${final_memory}MiB"
 fi
 
