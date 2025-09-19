@@ -6,80 +6,80 @@ provisioning_memory_allocator = 30
 
 auth_resources = {
   requests = {
-    cpu = "731m"
-    memory = "586Mi"
+    cpu = "608m"
+    memory = "749Mi"
   }
   limits = {
-    memory = "586Mi"
+    memory = "749Mi"
   }
 }
 
 db_resources = {
   requests = {
-    cpu = "34m"
-    memory = "119Mi"
+    cpu = "43m"
+    memory = "125Mi"
   }
   limits = {
-    memory = "119Mi"
+    memory = "125Mi"
   }
 }
 
 image_resources = {
   requests = {
-    cpu = "767m"
-    memory = "864Mi"
+    cpu = "691m"
+    memory = "929Mi"
   }
   limits = {
-    memory = "864Mi"
+    memory = "929Mi"
   }
 }
 
 persistence_resources = {
   requests = {
-    cpu = "872m"
-    memory = "769Mi"
+    cpu = "1030m"
+    memory = "891Mi"
   }
   limits = {
-    memory = "769Mi"
+    memory = "891Mi"
   }
 }
 
 rabbitmq_resources = {
   requests = {
-    cpu = "277m"
-    memory = "427Mi"
+    cpu = "381m"
+    memory = "694Mi"
   }
   limits = {
-    memory = "427Mi"
+    memory = "694Mi"
   }
 }
 
 recommender_resources = {
   requests = {
-    cpu = "311m"
-    memory = "535Mi"
+    cpu = "383m"
+    memory = "844Mi"
   }
   limits = {
-    memory = "535Mi"
+    memory = "844Mi"
   }
 }
 
 registry_resources = {
   requests = {
-    cpu = "88m"
-    memory = "332Mi"
+    cpu = "115m"
+    memory = "390Mi"
   }
   limits = {
-    memory = "332Mi"
+    memory = "390Mi"
   }
 }
 
 webui_resources = {
   requests = {
-    cpu = "1560m"
-    memory = "1141Mi"
+    cpu = "1960m"
+    memory = "1572Mi"
   }
   limits = {
-    memory = "1141Mi"
+    memory = "1572Mi"
   }
 }
