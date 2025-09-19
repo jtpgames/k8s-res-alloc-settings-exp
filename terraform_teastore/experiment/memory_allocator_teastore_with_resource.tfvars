@@ -1,6 +1,6 @@
 # ---- noise-neighbor variables ---
 
-provisioning_memory_allocator = 1
+provisioning_memory_allocator = 30
 
 # ---- teastore variables ---
 
