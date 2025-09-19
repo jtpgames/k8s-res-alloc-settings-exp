@@ -11,7 +11,7 @@ resource "kubernetes_deployment_v1" "memory-allocator" {
   }
 
   spec {
-    replicas = 1
+    replicas = var.provisioning_memory_allocator
 
     selector {
       match_labels = {
@@ -62,7 +62,7 @@ resource "kubernetes_service_v1" "memory-allocator" {
       protocol    = "TCP"
     }
 
-    type = "ClusterIP"
+    type = "LoadBalancer"
   }
 }
 
