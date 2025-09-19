@@ -36,6 +36,12 @@ resource "kubernetes_deployment_v1" "cpu-load-generator" {
           image                      = "${var.image_registry.url}/experiments:cpu-load-generator"
           image_pull_policy          = "Always"
           name                       = "cpu-load-generator"
+
+          resources {
+            requests = {
+              # cpu    = "2m"
+            }
+          }
         }
       }
     }
