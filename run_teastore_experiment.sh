@@ -40,11 +40,16 @@ function create_and_activate_venv_in_current_dir {
 # Parse command line arguments
 skip_warmup=false
 experiment_type="training"  # default to training
+teastore_with_resource_configurations=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --skip-warmup)
       skip_warmup=true
+      shift # past argument
+      ;;
+    --ts-with-res-conf)
+      teastore_with_resource_configurations=true
       shift # past argument
       ;;
     --experiment-type)
@@ -59,7 +64,8 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
-      echo "  --skip-warmup              Skip the warmup phase (set first_iteration to false)"
+      echo "  --skip-warmup               Skip the warmup phase"
+      echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), memory-noisy-neighbor, cpu-noisy-neighbor"
       echo "  -h, --help                  Show this help message"
       exit 0
@@ -87,8 +93,29 @@ cd terraform_teastore
 
 set -e  # abort on first error inside this block
 ./prepare_terraform_scripts.sh
-./deploy.sh
-set +e  # back to normal (script won’t exit on error anymore)
+
+# Determine deployment type based on experiment type and resource configuration
+if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
+  if [ "$teastore_with_resource_configurations" = true ]; then
+    deployment_type="mem-with-resources"
+  else
+    deployment_type="mem-without-resources"
+  fi
+elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
+  if [ "$teastore_with_resource_configurations" = true ]; then
+    deployment_type="cpu-with-resources"
+  else
+    deployment_type="cpu-without-resources"
+  fi
+else
+  # For training or any other experiment type, use default
+  deployment_type="default"
+fi
+
+echo "Using deployment type: $deployment_type"
+echo "$deployment_type" > "current_deployment_type.txt"
+./deploy.sh "$deployment_type"
+set +e  # back to normal (script won't exit on error anymore)
 
 cd ..
 
@@ -133,19 +160,21 @@ root_folder=$(pwd)
 experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*" | sort -V | tail -n1) || [ -z "$experiment_dir" ]
 echo "Using experiment directory: $experiment_dir"
 
-target_directory="$root_folder/$experiment_dir/Training_Data/LoadTester_Logs_${START_TIME}"
+training_experiment_directory="$root_folder/$experiment_dir/Training_Data"
 memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment"
+cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment"
 locust_directory="$root_folder/locust_scripts"
 
-mkdir -pv "$target_directory"
+mkdir -pv "$training_experiment_directory"
 mkdir -pv "$memory_noisy_neighbor_experiment_dir"
+mkdir -pv "$cpu_noisy_neighbor_experiment_dir"
 
 # perform a few requests to warm up the service (a real warmup is performed by the load test later,
 # this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
 
-curl "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
 sleep 1
 curl "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
+sleep 1
 
 set -e  # abort on first error inside this block
 
@@ -181,11 +210,26 @@ fi
 
 # Start memory experiment if experiment type is memory-noisy-neighbor
 if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
+  target_directory="$memory_noisy_neighbor_experiment_dir/LoadTester_Logs_${START_TIME}"
+  mkdir -pv "$target_directory"
+
   echo "Starting memory experiment in background..."
   memory_log_file="$memory_noisy_neighbor_experiment_dir/memory_experiment_${START_TIME}.log"
-  ./run_memory_experiment.sh --skip-modules-modification --once > "$memory_log_file" 2>&1 &
+  ./run_memory_experiment.sh --skip-modules-modification > "$memory_log_file" 2>&1 &
   memory_experiment_pid=$!
   echo "Memory experiment started with PID $memory_experiment_pid, logging to $memory_log_file"
+elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
+  target_directory="$cpu_noisy_neighbor_experiment_dir/LoadTester_Logs_${START_TIME}"
+  mkdir -pv "$target_directory"
+
+  echo "Starting CPU experiment in background..."
+  cpu_log_file="$cpu_noisy_neighbor_experiment_dir/cpu_experiment_${START_TIME}.log"
+  ./run_memory_experiment.sh > "$cpu_log_file" 2>&1 &
+  cpu_experiment_pid=$!
+  echo "CPU experiment started with PID $cpu_experiment_pid, logging to $cpu_log_file"
+else
+  target_directory="$training_experiment_directory/LoadTester_Logs_${START_TIME}"
+  mkdir -pv "$target_directory"
 fi
 
 for profile in $PROFILES_TO_USE; do
