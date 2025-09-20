@@ -62,7 +62,11 @@ resource "kubernetes_service_v1" "memory-allocator" {
       protocol    = "TCP"
     }
 
-    type = "LoadBalancer"
+    type                     = "LoadBalancer"
+    # Since all pods are on same node due to NodeSelector, 
+    # "Local" will distribute traffic equally among local pods
+    external_traffic_policy  = "Local"
+    session_affinity        = "None"
   }
 }
 
