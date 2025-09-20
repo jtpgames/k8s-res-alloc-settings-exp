@@ -36,3 +36,5 @@ override.tf.json
 terraform.rc
 
 variables.tf
+
+current_deployment_type.txt
