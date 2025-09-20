@@ -22,8 +22,3 @@ variable "provisioning_memory_allocator" {
   type    = number
 }
 
-variable "enable_ipvs_mode" {
-  description = "Enable IPVS mode for kube-proxy instead of iptables"
-  type        = bool
-  default     = false
-}

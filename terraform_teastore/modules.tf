@@ -45,7 +45,4 @@ module "noise-neighbor" {
 
   provisioning_cpu_load_generator = var.provisioning_cpu_load_generator
   provisioning_memory_allocator   = var.provisioning_memory_allocator
-  
-  # Enable IPVS mode for better load balancing
-  enable_ipvs_mode = true
 }
