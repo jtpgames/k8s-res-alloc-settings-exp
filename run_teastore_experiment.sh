@@ -224,7 +224,7 @@ elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
 
   echo "Starting CPU experiment in background..."
   cpu_log_file="$cpu_noisy_neighbor_experiment_dir/cpu_experiment_${START_TIME}.log"
-  ./run_memory_experiment.sh > "$cpu_log_file" 2>&1 &
+  ./run_cpu_experiment.sh > "$cpu_log_file" 2>&1 &
   cpu_experiment_pid=$!
   echo "CPU experiment started with PID $cpu_experiment_pid, logging to $cpu_log_file"
 else
