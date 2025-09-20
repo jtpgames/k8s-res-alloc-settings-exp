@@ -3,6 +3,7 @@
 # Initialize variables
 SKIP_MODULES_MODIFICATION=false
 RUN_TWICE=true
+SKIP_WARMUP=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -13,6 +14,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -o|--once)
       RUN_TWICE=false
+      shift
+      ;;
+    --skip-warmup)
+      SKIP_WARMUP=true
       shift
       ;;
     *)
@@ -145,6 +150,43 @@ try_get_resource_usage() {
     fi
 }
 
+cleanup_memory_allocators() {
+    echo "Starting memory allocator cleanup..." >&2
+    
+    # Check if current_deployment_type.txt exists
+    if [ ! -f "terraform_teastore/current_deployment_type.txt" ]; then
+        echo "Error: terraform_teastore/current_deployment_type.txt file not found" >&2
+        return 1
+    fi
+    
+    # Read the deployment type from the file
+    local deployment_type
+    deployment_type=$(cat "terraform_teastore/current_deployment_type.txt" | tr -d '\n')
+    
+    # Validate that deployment type was read
+    if [ -z "$deployment_type" ]; then
+        echo "Error: No deployment type found in terraform_teastore/current_deployment_type.txt" >&2
+        return 1
+    fi
+   
+    ./get-k8s-resource-usage.sh -n noisy-neighbor
+
+    echo "Current deployment type: $deployment_type" >&2
+    echo "Terminating and restarting memory allocators to free memory..." >&2
+    
+    # Change to terraform_teastore directory and run deploy.sh
+    cd terraform_teastore
+    if ./deploy.sh "$deployment_type"; then
+        echo "Memory allocator cleanup completed successfully" >&2
+        cd ..
+        return 0
+    else
+        echo "Error: Failed to cleanup memory allocators" >&2
+        cd ..
+        return 1
+    fi
+}
+
 if [ "$SKIP_MODULES_MODIFICATION" = false ]; then
     cd terraform
     # Check if modules.tf exists
@@ -191,6 +233,27 @@ fi
 
 echo "Cluster-IP: $cluster_public_ip"
 
+if [ "$SKIP_WARMUP" = false ]; then
+  WAIT_MINUTES=5
+  WAIT_SECONDS=$((WAIT_MINUTES * 60))
+
+  echo "Waiting ${WAIT_MINUTES} minutes for TeaStore warmup to finish..."
+
+  for i in $(seq "$WAIT_SECONDS" -1 1); do
+    if [ -t 1 ]; then
+      # stdout is a terminal → overwrite the same line
+      printf "\rTime left: %3ds" "$i"
+    fi
+    sleep 1
+  done
+
+  if [ -t 1 ]; then
+    echo -e "\nWarmup finished."
+  else
+    echo "Warmup finished."
+  fi
+fi
+
 # Get initial memory usage of memory-allocator pod
 
 result=$(try_get_resource_usage "noisy-neighbor" "memory")
@@ -209,14 +272,22 @@ memory_to_allocate=500
 total_memory=$initial_memory_usage
 
 # Call the function and capture the result
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "14000")
+final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "15000")
 echo "First run: final memory allocation: ${final_memory}MiB"
 
 if [ "$RUN_TWICE" = true ]; then
+  # Cleanup memory allocators to free allocated memory
+  echo "\nCleaning up memory allocators..."
+  if cleanup_memory_allocators; then
+    echo "Memory cleanup completed successfully."
+  else
+    echo "Warning: Memory cleanup failed. Manual cleanup may be required."
+  fi
+
   echo "After the pod is evicted, we have to wait until kubernetes reschedules the pod. This can range from a couple of seconds up to ten minutes."
   sleep 10
 
-  # Repeatetly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
+  # Repeatedly get initial memory usage of memory-allocator pod to find out when the pod was rescheduled
   result=$(try_get_resource_usage "noisy-neighbor" "memory")
   exit_code=$?
 
@@ -234,11 +305,20 @@ if [ "$RUN_TWICE" = true ]; then
   total_memory=$initial_memory_usage
 
   # final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
-  final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "14000")
+  final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "15000")
   echo "Second run: final memory allocation: ${final_memory}MiB"
+fi
+
+# Cleanup memory allocators to free allocated memory
+echo "\nCleaning up memory allocators..."
+if cleanup_memory_allocators; then
+  echo "Memory cleanup completed successfully."
+else
+  echo "Warning: Memory cleanup failed. Manual cleanup may be required."
 fi
 
 echo "show resource usage of workloads after experiment."
 ./get-k8s-resource-usage.sh
 ./get-k8s-resource-usage.sh -n noisy-neighbor
 ./get-k8s-resource-usage.sh -n teastore
+
