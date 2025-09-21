@@ -29,21 +29,24 @@ esac
 
 terraform init
 
+# Define TeaStore deployment replacements
+TEASTORE_REPLACEMENTS="-replace=module.teastore.kubernetes_deployment_v1.auth -replace=module.teastore.kubernetes_deployment_v1.db -replace=module.teastore.kubernetes_deployment_v1.image -replace=module.teastore.kubernetes_deployment_v1.persistence -replace=module.teastore.kubernetes_deployment_v1.rabbitmq -replace=module.teastore.kubernetes_deployment_v1.recommender -replace=module.teastore.kubernetes_deployment_v1.registry -replace=module.teastore.kubernetes_deployment_v1.webui"
+
 # Select and execute the appropriate terraform apply command based on the argument
 case "$DEPLOYMENT_TYPE" in
     "mem-without-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" 
+        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $TEASTORE_REPLACEMENTS
         ;;
     "mem-with-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" 
+        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $TEASTORE_REPLACEMENTS
         ;;
     "cpu-without-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]"
+        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $TEASTORE_REPLACEMENTS
         ;;
     "cpu-with-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]"
+        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $TEASTORE_REPLACEMENTS
         ;;
     "default")
-        terraform apply -auto-approve
+        terraform apply -auto-approve $TEASTORE_REPLACEMENTS
       ;;
 esac
