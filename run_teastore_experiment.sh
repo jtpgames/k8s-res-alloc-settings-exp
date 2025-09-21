@@ -41,6 +41,7 @@ function create_and_activate_venv_in_current_dir {
 skip_warmup=false
 experiment_type="training"  # default to training
 teastore_with_resource_configurations=false
+skip_cluster_destruction=true
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --ts-with-res-conf)
       teastore_with_resource_configurations=true
+      shift # past argument
+      ;;
+    --destroy-cluster)
+      skip_cluster_destruction=false
       shift # past argument
       ;;
     --experiment-type)
@@ -67,6 +72,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-warmup               Skip the warmup phase"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), memory-noisy-neighbor, cpu-noisy-neighbor"
+      echo "  --destroy-cluster           Destroy the Kubernetes cluster at the end"
       echo "  -h, --help                  Show this help message"
       exit 0
       ;;
@@ -161,43 +167,118 @@ experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*
 echo "Using experiment directory: $experiment_dir"
 
 training_experiment_directory="$root_folder/$experiment_dir/Training_Data"
-memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment"
-cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment"
+memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment/$deployment_type"
+cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$deployment_type"
 locust_directory="$root_folder/locust_scripts"
 
 mkdir -pv "$training_experiment_directory"
 mkdir -pv "$memory_noisy_neighbor_experiment_dir"
 mkdir -pv "$cpu_noisy_neighbor_experiment_dir"
 
-# perform a few requests to warm up the service (a real warmup is performed by the load test later,
-# this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
+echo "Waiting for 60 seconds for TeaStore to start up"
+sleep 60
 
-sleep 1
-curl "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
-sleep 1
-
-set -e  # abort on first error inside this block
-
-echo "Sending curl requests to teastore to warm it up ..."
-for i in {1..5}
-do
-  echo "$i/5"
-
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
-  sleep 0.1
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/"
-  sleep 0.1
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/login"
-  sleep 0.1
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1"
-  sleep 0.1
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7"
-  sleep 0.1
-  curl -s -f -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/profile"
-  sleep 0.1
+# Retry TeaStore status request until successful
+max_retries=20
+retry_count=0
+while [ $retry_count -lt $max_retries ]; do
+  echo "Attempting to request status of TeaStore (attempt $((retry_count + 1))/$max_retries)..."
+  if curl -s -f -m 10 "http://$cluster_public_ip/tools.descartes.teastore.webui/status" > /dev/null 2>&1; then
+    echo "Successfully connected to TeaStore!"
+    break
+  else
+    retry_count=$((retry_count + 1))
+    if [ $retry_count -lt $max_retries ]; then
+      echo "Failed, retrying in 1 second..."
+      sleep 1
+    else
+      echo "Error: Failed to request status from TeaStore after $max_retries attempts"
+      exit 1
+    fi
+  fi
 done
 
-set +e  # back to normal (script won’t exit on error anymore)
+# perform a few requests to warm up the service (a real warmup is performed by the load test later,
+# this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
+echo "Sending curl requests to teastore to warm it up ..."
+
+# Retry the entire warmup sequence if any curl request fails
+max_warmup_retries=5
+warmup_retry_count=0
+warmup_success=false
+
+while [ $warmup_retry_count -lt $max_warmup_retries ] && [ "$warmup_success" = false ]; do
+  echo "Warmup attempt $((warmup_retry_count + 1))/$max_warmup_retries"
+  warmup_failed=false
+  
+  for i in {1..5}; do
+    echo "  Warmup request $i/5"
+    
+    # Test each endpoint and break the loop if any fails
+
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: status endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+    
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: home endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+    
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/login"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: login endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+    
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: category endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+    
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: product endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+    
+    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/profile"
+    if [ $? -ne 0 ]; then
+      echo "    Failed: profile endpoint"
+      warmup_failed=true
+      break
+    fi
+    sleep 0.1
+  done
+  
+  if [ "$warmup_failed" = true ]; then
+    warmup_retry_count=$((warmup_retry_count + 1))
+    if [ $warmup_retry_count -lt $max_warmup_retries ]; then
+      echo "  Warmup failed, retrying in 3 seconds..."
+      sleep 3
+    else
+      echo "Error: Warmup failed after $max_warmup_retries attempts"
+      exit 1
+    fi
+  else
+    warmup_success=true
+    echo "  Warmup completed successfully!"
+  fi
+done
 
 # Set first_iteration based on command line argument
 if [ "$skip_warmup" = true ]; then
@@ -268,13 +349,16 @@ echo "*** All load intensity profiles have been executed\n"
 echo "******* Remember to download the recorded resource usages before exiting *******\n"
 echo "*** Navigate to http://$cluster_public_ip/grafana to download them\n"
 
-# -s: Do not echo input coming from a terminal
-# -n 1: Read one character
-echo "Press any key to continue and delete the testbed k8s cluster..."
-read -s -n 1
-
-cd terraform_teastore
-terraform destroy
-cd ..
-
-./destroy_k8s_cluster.sh
+# Check if cluster destruction should be skipped
+if [ "$skip_cluster_destruction" = true ]; then
+  echo "*** Cluster destruction skipped (--skip-cluster-destruction flag provided) ***"
+  echo "*** To manually destroy the cluster later, run: ***"
+  echo "***   cd terraform_teastore && terraform destroy && cd .. && ./destroy_k8s_cluster.sh ***"
+  echo "*** Remember to download resource usage data from http://$cluster_public_ip/grafana ***"
+else
+  cd terraform_teastore
+  terraform destroy
+  cd ..
+  
+  ./destroy_k8s_cluster.sh
+fi
