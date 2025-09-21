@@ -171,10 +171,6 @@ memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experi
 cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$deployment_type"
 locust_directory="$root_folder/locust_scripts"
 
-mkdir -pv "$training_experiment_directory"
-mkdir -pv "$memory_noisy_neighbor_experiment_dir"
-mkdir -pv "$cpu_noisy_neighbor_experiment_dir"
-
 echo "Waiting for 60 seconds for TeaStore to start up"
 sleep 60
 
