@@ -176,7 +176,7 @@ cleanup_memory_allocators() {
     
     # Change to terraform_teastore directory and run deploy.sh
     cd terraform_teastore
-    if ./deploy.sh "$deployment_type"; then
+    if ./deploy.sh "$deployment_type" --skip-teastore; then
         echo "Memory allocator cleanup completed successfully" >&2
         cd ..
         return 0
