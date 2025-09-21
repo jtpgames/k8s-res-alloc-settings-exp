@@ -7,7 +7,7 @@ resource "kubernetes_deployment_v1" "memory-allocator" {
   count      = var.provisioning_memory_allocator != 0 ? 1 : 0
   depends_on = [
     kubernetes_default_service_account_v1.noise-neighbor,
-    kubernetes_daemon_set_v1.ipvs_modules_loader,  
+    # kubernetes_daemon_set_v1.ipvs_modules_loader,  
   ]
 
   metadata {
