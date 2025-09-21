@@ -1,11 +1,34 @@
 #!/bin/bash
 
+SKIP_WARMUP=false
+
 cluster_public_ip=$(cat "cluster_public_ip.txt")
 
 # Check if IP is empty
 if [ -z "$cluster_public_ip" ]; then
   echo "Error: No cluster IP found in ingress"
   exit 1
+fi
+
+if [ "$SKIP_WARMUP" = false ]; then
+  WAIT_MINUTES=5
+  WAIT_SECONDS=$((WAIT_MINUTES * 60))
+
+  echo "Waiting ${WAIT_MINUTES} minutes for TeaStore warmup to finish..."
+
+  for i in $(seq "$WAIT_SECONDS" -1 1); do
+    if [ -t 1 ]; then
+      # stdout is a terminal → overwrite the same line
+      printf "\rTime left: %3ds" "$i"
+    fi
+    sleep 1
+  done
+
+  if [ -t 1 ]; then
+    echo -e "\nWarmup finished."
+  else
+    echo "Warmup finished."
+  fi
 fi
 
 cpu_to_allocate=100
