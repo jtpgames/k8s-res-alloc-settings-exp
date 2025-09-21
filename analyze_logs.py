@@ -4,7 +4,13 @@
 Locust Log Analyzer
 
 Analyzes locust log files to extract response times and error counts,
-creating bar charts for visualization.
+creating bar charts for visualization with enhanced request count display.
+
+Features:
+- Response time analysis with request count visualization
+- Detailed error categorization by HTTP status and functional types
+- Success rate calculation and statistics
+- PDF chart generation with experiment type detection
 """
 
 import re
@@ -85,15 +91,23 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats]
     response_times = defaultdict(list)
     error_stats = ErrorStats()
     
-    # Pattern to match response time lines: (METHOD endpoint) Response time X ms
-    response_pattern = re.compile(r'\(([A-Z]+\s+\w+)\)\s+Response\s+time\s+(\d+)\s+ms')
+    # Pattern to match response time lines in INFO logs: (METHOD endpoint) Response time X ms
+    response_pattern = re.compile(r'/INFO/root:\s+\(([A-Z]+\s+\w+)\)\s+Response\s+time\s+(\d+)\s+ms')
     
     # Pattern to match error lines and capture the error message
     error_pattern = re.compile(r'ERROR/root: user\d+: (.*)$')
+   
+    warmup_pattern = re.compile(r'Warm-Up finished.*Regular load profile starts', re.IGNORECASE)
+    warmup_finished = False
     
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             for line_num, line in enumerate(file, 1):
+                if not warmup_finished:
+                    if warmup_pattern.search(line):
+                        warmup_finished = True
+                    continue
+
                 # Check for response time entries
                 response_match = response_pattern.search(line)
                 if response_match:
@@ -153,7 +167,7 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats]
                             error_stats.other_errors += 1
                             error_type = "Other"
                         
-                        typer.echo(f"Found {error_type} error at line {line_num}: {line.strip()}")
+                        # typer.echo(f"Found {error_type} error at line {line_num}: {line.strip()}")
     
     except FileNotFoundError:
         typer.echo(f"Error: File '{file_path}' not found.", err=True)
@@ -180,7 +194,7 @@ def calculate_statistics(response_times: Dict[str, List[float]]) -> pd.DataFrame
     
     return pd.DataFrame(stats).sort_values('Average Response Time (ms)', ascending=False)
 
-def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir: Path):
+def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir: Path, log_file: Path):
     """Create and save bar charts for response times and error count."""
     
     # Create figure with subplots - optimized size for compact layout
@@ -188,20 +202,31 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
     
     # Plot 1: Average Response Times by Request Type
     if not stats_df.empty:
+        # Calculate total request count for title
+        total_requests = stats_df['Count'].sum()
+        
+        # Create the primary bars for response times
         bars1 = ax1.bar(range(len(stats_df)), stats_df['Average Response Time (ms)'], 
                        color='skyblue', alpha=0.7)
         ax1.set_xlabel('Request Type')
-        ax1.set_ylabel('Average Response Time (ms)')
-        ax1.set_title('Average Response Times per Request Type')
+        ax1.set_ylabel('Average Response Time (ms)', color='#2980b9')
+        ax1.set_title(f'Average Response Times per Request Type (Total Requests: {total_requests:,})')
         ax1.set_xticks(range(len(stats_df)))
         ax1.set_xticklabels(stats_df['Request Type'], rotation=45, ha='right')
         ax1.grid(axis='y', alpha=0.3)
         
-        # Add value labels on bars
+        # Add value labels on bars for response time
         for i, bar in enumerate(bars1):
             height = bar.get_height()
             ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                    f'{height:.1f}ms', ha='center', va='bottom', fontsize=8)
+                    f'{height:.1f}ms', ha='center', va='bottom', fontsize=8, color='#2980b9')
+            
+            # Add request count below the bar labels
+            count = stats_df.iloc[i]['Count']
+            ax1.text(bar.get_x() + bar.get_width()/2., height/2,
+                    f'{count:,}\nreqs', ha='center', va='center', 
+                    fontsize=8, color='black', fontweight='bold', 
+                    bbox=dict(facecolor='white', alpha=0.7, pad=1, boxstyle='round,pad=0.2'))
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
@@ -246,13 +271,23 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
     plt.subplots_adjust(hspace=0.4)  # Reduce vertical spacing between subplots
     plt.tight_layout(pad=1.0)  # Reduce overall padding
     
-    # Save the plot as a vector PDF
-    output_file = output_dir / 'locust_analysis_results.pdf'
+    # Save the plot as a vector PDF with experiment type prefix
+    # Get experiment type from the second parent directory of the log file path
+    try:
+        # Attempt to get the experiment type from the second parent directory
+        experiment_type = log_file.parent.parent.name
+        output_filename = f'{experiment_type}_locust_analysis_results.pdf'
+    except (AttributeError, IndexError):
+        # Fallback if we can't determine the experiment type
+        output_filename = 'locust_analysis_results.pdf'
+        typer.echo("Warning: Could not determine experiment type from log file path")
+    
+    output_file = output_dir / output_filename
     plt.savefig(output_file, format='pdf', bbox_inches='tight')
     typer.echo(f"Chart saved to: {output_file}")
     
     # Show the plot
-    plt.show()
+    # plt.show()
 
 def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
     """Print a summary of the analysis results."""
@@ -261,7 +296,9 @@ def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
     typer.echo("="*60)
     
     if not stats_df.empty:
+        total_requests = stats_df['Count'].sum()
         typer.echo(f"\nFound {len(stats_df)} different request types:")
+        typer.echo(f"Total Requests Processed: {total_requests:,}")
         typer.echo("\nResponse Time Statistics:")
         typer.echo(stats_df.to_string(index=False, float_format='%.2f'))
         
@@ -272,8 +309,13 @@ def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
     else:
         typer.echo("\nNo response time data found in the log file.")
     
-    # Print detailed error statistics
-    typer.echo(f"\nError Statistics:")
+    # Print detailed error statistics with success rate
+    typer.echo(f"\nRequest Completion Statistics:")
+    if not stats_df.empty:
+        total_requests = stats_df['Count'].sum()
+        success_rate = ((total_requests - error_stats.total_errors) / total_requests * 100) if total_requests > 0 else 0
+        typer.echo(f"  Total Requests: {total_requests:,}")
+        typer.echo(f"  Successful Requests: {total_requests - error_stats.total_errors:,} ({success_rate:.1f}%)")
     typer.echo(f"  Total Errors: {error_stats.total_errors}")
     
     if error_stats.total_errors > 0:
@@ -328,8 +370,12 @@ def analyze(
 ):
     """
     Analyze a locust log file and create bar charts showing:
-    1. Average response times per request type
-    2. Total number of errors
+    1. Average response times per request type (with request counts displayed)
+    2. Total number of errors by category
+    
+    The response time chart now includes:
+    - Total request count in the title
+    - Individual request counts displayed within each bar
     """
     
     # Validate input file
@@ -366,7 +412,7 @@ def analyze(
     
     # Create and save charts
     typer.echo("Creating charts...")
-    create_bar_chart(stats_df, error_stats, output_dir)
+    create_bar_chart(stats_df, error_stats, output_dir, log_file)
     
     # Print summary
     print_summary(stats_df, error_stats)
