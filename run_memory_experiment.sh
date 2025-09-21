@@ -276,7 +276,7 @@ final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$me
 echo "First run: final memory allocation: ${final_memory}MiB"
 
 if [ "$RUN_TWICE" = true ]; then
-  # Cleanup memory allocators to free allocated memory
+  # Cleanup memory allocators to free allocated memory for the second run
   echo "\nCleaning up memory allocators..."
   if cleanup_memory_allocators; then
     echo "Memory cleanup completed successfully."
@@ -307,14 +307,6 @@ if [ "$RUN_TWICE" = true ]; then
   # final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "$final_memory_allocated")
   final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "15000")
   echo "Second run: final memory allocation: ${final_memory}MiB"
-fi
-
-# Cleanup memory allocators to free allocated memory
-echo "\nCleaning up memory allocators..."
-if cleanup_memory_allocators; then
-  echo "Memory cleanup completed successfully."
-else
-  echo "Warning: Memory cleanup failed. Manual cleanup may be required."
 fi
 
 echo "show resource usage of workloads after experiment."
