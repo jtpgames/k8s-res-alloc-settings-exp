@@ -174,23 +174,43 @@ locust_directory="$root_folder/locust_scripts"
 echo "Waiting for 60 seconds for TeaStore to start up"
 sleep 60
 
-# Retry TeaStore status request until successful
+# Retry TeaStore status request until all services are OK
 max_retries=20
 retry_count=0
 while [ $retry_count -lt $max_retries ]; do
-  echo "Attempting to request status of TeaStore (attempt $((retry_count + 1))/$max_retries)..."
-  if curl -s -f -m 10 "http://$cluster_public_ip/tools.descartes.teastore.webui/status" > /dev/null 2>&1; then
-    echo "Successfully connected to TeaStore!"
-    break
-  else
-    retry_count=$((retry_count + 1))
-    if [ $retry_count -lt $max_retries ]; then
-      echo "Failed, retrying in 1 second..."
-      sleep 1
+  echo "Checking TeaStore services status (attempt $((retry_count + 1))/$max_retries)..."
+  
+  # Get the status page response
+  status_response=$(curl -s -m 10 "http://$cluster_public_ip/tools.descartes.teastore.webui/status" 2>/dev/null)
+  curl_exit_code=$?
+  
+  if [ $curl_exit_code -eq 0 ] && [ -n "$status_response" ]; then
+    # Use Python script to parse HTML and check if all services are OK
+    if echo "$status_response" | python check_teastore_status.py /dev/stdin > /dev/null 2>&1; then
+      # Get the detailed status output for logging
+      detailed_status=$(echo "$status_response" | python check_teastore_status.py /dev/stdin 2>/dev/null)
+      echo "✓ All TeaStore services are ready!"
+      echo "$detailed_status" | grep -E "(Found [0-9]+ services|✓ Services OK:|\ \ - )"
+      break
     else
-      echo "Error: Failed to request status from TeaStore after $max_retries attempts"
-      exit 1
+      # Get the detailed status output for logging
+      detailed_status=$(echo "$status_response" | python check_teastore_status.py /dev/stdin 2>/dev/null || echo "Failed to parse status")
+      echo "✗ Not all TeaStore services are ready yet:"
+      echo "$detailed_status" | head -10
     fi
+  else
+    echo "✗ Failed to connect to TeaStore status endpoint (curl exit code: $curl_exit_code)"
+  fi
+  
+  retry_count=$((retry_count + 1))
+  if [ $retry_count -lt $max_retries ]; then
+    echo "Retrying in 5 seconds..."
+    sleep 5
+  else
+    echo "Error: TeaStore services are not all ready after $max_retries attempts"
+    echo "Last status response (first 500 chars):"
+    echo "$status_response" | head -c 500
+    exit 1
   fi
 done
 
@@ -292,7 +312,7 @@ if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
 
   echo "Starting memory experiment in background..."
   memory_log_file="$memory_noisy_neighbor_experiment_dir/memory_experiment_${START_TIME}.log"
-  ./run_memory_experiment.sh --skip-modules-modification > "$memory_log_file" 2>&1 &
+  ./run_memory_experiment.sh --skip-modules-modification --once > "$memory_log_file" 2>&1 &
   memory_experiment_pid=$!
   echo "Memory experiment started with PID $memory_experiment_pid, logging to $memory_log_file"
 elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
