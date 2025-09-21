@@ -102,3 +102,12 @@ case "$DEPLOYMENT_TYPE" in
         terraform apply -auto-approve $REPLACEMENTS
         ;;
 esac
+
+# Clean up succeeded and failed pods in experiment namespaces
+echo "Cleaning up completed and failed pods in experiment namespaces..."
+kubectl delete pod --field-selector=status.phase==Succeeded -n teastore --ignore-not-found=true
+kubectl delete pod --field-selector=status.phase==Failed -n teastore --ignore-not-found=true
+kubectl delete pod --field-selector=status.phase==Succeeded -n noisy-neighbor --ignore-not-found=true
+kubectl delete pod --field-selector=status.phase==Failed -n noisy-neighbor --ignore-not-found=true
+
+echo "Deployment completed successfully!"
