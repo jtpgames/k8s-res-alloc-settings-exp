@@ -2,3 +2,4 @@
 
 git submodule add https://github.com/jtpgames/Locust_Scripts locust_scripts
 git submodule add https://github.com/jtpgames/RAST-Common-Python.git RAST-Common-Python
+git submodule add https://github.com/jtpgames/TeaStore TeaStore
