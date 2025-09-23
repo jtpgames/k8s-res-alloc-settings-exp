@@ -1,5 +1,6 @@
 locals {
   namespace = "noisy-neighbor"
+  deployment_id = formatdate("YYYYMMDD-HHmm", timestamp())  # e.g., "20250920-1430"
 }
 
 variable "node" {
