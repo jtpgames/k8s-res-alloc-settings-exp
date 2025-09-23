@@ -7,6 +7,13 @@ variable "node" {
   type        = string
 }
 
+variable "image_registry" {
+  type = object({
+    url                      = string
+    path_to_dockerconfigjson = string
+  })
+}
+
 variable "rabbitmq_resources" {
   type = object({
     limits = object({

@@ -22,6 +22,11 @@ module "teastore" {
 
   node = local.nodes.main
 
+  image_registry = {
+    url                      = local.image_registry_url
+    path_to_dockerconfigjson = local.dockerconfig_path
+  }
+  
   auth_resources = var.auth_resources
   db_resources = var.db_resources
   image_resources = var.image_resources
