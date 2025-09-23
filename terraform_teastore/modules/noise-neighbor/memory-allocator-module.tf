@@ -2,7 +2,7 @@ module "memory-allocator" {
   depends_on = [kubernetes_default_service_account_v1.noise-neighbor]
   source = "./memory-allocator"
 
-  for_each = toset(var.provisioning_memory_allocator)
+  for_each = toset(range(var.provisioning_memory_allocator))
 
   namespace = local.namespace
   node      = var.node
