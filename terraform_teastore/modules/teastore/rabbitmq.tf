@@ -1,5 +1,5 @@
 resource "kubernetes_deployment_v1" "rabbitmq" {
-  depends_on = [kubernetes_namespace_v1.teastore]
+  depends_on = [kubernetes_default_service_account_v1.teastore]
 
   metadata {
     labels = {
@@ -32,7 +32,7 @@ resource "kubernetes_deployment_v1" "rabbitmq" {
         }
 
         container {
-          image             = "descartesresearch/teastore-kieker-rabbitmq"
+          image             = "${var.image_registry.url}/experiments:tools.descartes.teastore.kieker.rabbitmq"
           image_pull_policy = "Always"
           name              = "rabbitmq"
 
