@@ -105,8 +105,13 @@ def parse_multiple_log_files(log_files: List[Path]) -> List[FileData]:
         typer.echo(f"Parsing {log_file.name}...")
         response_times, error_stats = parse_log_file(log_file)
         
-        # Create a human-readable label from the file name
-        file_label = log_file.stem  # Get filename without extension
+        # Create a human-readable label using experiment type
+        try:
+            experiment_type = log_file.parent.parent.name
+            file_label = experiment_type
+        except (AttributeError, IndexError):
+            # Fallback to filename if we can't determine experiment type
+            file_label = log_file.stem
         
         file_data = FileData(
             file_path=log_file,
@@ -364,11 +369,13 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         bar_width = 0.8 / len(file_data_list)  # Width of each bar group
         x_positions = np.arange(len(all_request_types))
         
-        total_requests_all_files = 0
+        # Calculate per-file totals for title
+        file_totals = []
         
         for i, file_data in enumerate(file_data_list):
             file_response_times = []
             file_request_counts = []
+            file_total_requests = 0
             
             for request_type in all_request_types:
                 if request_type in file_data.response_times and file_data.response_times[request_type]:
@@ -381,7 +388,9 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 
                 file_response_times.append(avg_time)
                 file_request_counts.append(count)
-                total_requests_all_files += count
+                file_total_requests += count
+            
+            file_totals.append(file_total_requests)
             
             # Create bars for this file with specific texture
             hatch = hatch_patterns[i % len(hatch_patterns)]
@@ -404,7 +413,14 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         
         ax1.set_xlabel('Request Type')
         ax1.set_ylabel('Average Response Time (ms)', color='#2980b9')
-        ax1.set_title(f'Average Response Times per Request Type - Multiple Files (Total Requests: {total_requests_all_files:,})')
+        
+        # Create title with per-file request counts
+        title_parts = []
+        for file_data, total in zip(file_data_list, file_totals):
+            title_parts.append(f'{file_data.file_label}: {total:,}')
+        title_suffix = ' | '.join(title_parts)
+        ax1.set_title(f'Average Response Times per Request Type\n({title_suffix})')
+        
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
         ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
         ax1.grid(axis='y', alpha=0.3)
@@ -414,52 +430,73 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 ha='center', va='center', transform=ax1.transAxes)
         ax1.set_title('Average Response Times per Request Type - Multiple Files')
     
-    # Plot 2: Error Breakdown by Type (Combined from all files)
-    combined_error_stats = ErrorStats()
+    # Plot 2: Error Breakdown by Type (Per File with Textures)
+    # Collect all error types across all files
+    all_error_types = set()
     for file_data in file_data_list:
-        # Combine error stats from all files
-        combined_error_stats.http_500_errors += file_data.error_stats.http_500_errors
-        combined_error_stats.http_502_errors += file_data.error_stats.http_502_errors
-        combined_error_stats.http_503_errors += file_data.error_stats.http_503_errors
-        combined_error_stats.login_errors += file_data.error_stats.login_errors
-        combined_error_stats.logout_errors += file_data.error_stats.logout_errors
-        combined_error_stats.profile_errors += file_data.error_stats.profile_errors
-        combined_error_stats.product_errors += file_data.error_stats.product_errors
-        combined_error_stats.category_errors += file_data.error_stats.category_errors
-        combined_error_stats.page_load_errors += file_data.error_stats.page_load_errors
-        combined_error_stats.timeout_errors += file_data.error_stats.timeout_errors
-        combined_error_stats.unknown_errors += file_data.error_stats.unknown_errors
-        combined_error_stats.connection_errors += file_data.error_stats.connection_errors
-        combined_error_stats.other_errors += file_data.error_stats.other_errors
+        error_dict = file_data.error_stats.to_dict()
+        filtered_errors = {k: v for k, v in error_dict.items() if v > 0}
+        all_error_types.update(filtered_errors.keys())
     
-    error_dict = combined_error_stats.to_dict()
-    filtered_errors = {k: v for k, v in error_dict.items() if v > 0}
+    all_error_types = sorted(all_error_types)
     
-    if filtered_errors:
-        categories = list(filtered_errors.keys())
-        counts = list(filtered_errors.values())
+    if all_error_types:
+        error_bar_width = 0.8 / len(file_data_list)  # Width of each error bar group
+        error_x_positions = np.arange(len(all_error_types))
         
-        # Use the same color palette as before for errors
-        if len(categories) <= 8:
-            colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
-        else:
-            colors = cm.Set3(np.linspace(0, 1, len(categories)))
+        # Calculate total errors per file for title
+        file_error_totals = []
         
-        bars2 = ax2.bar(categories, counts, color=colors[:len(categories)], alpha=0.8)
+        for i, file_data in enumerate(file_data_list):
+            file_error_counts = []
+            
+            # Get error counts for this file for each error type
+            error_dict = file_data.error_stats.to_dict()
+            for error_type in all_error_types:
+                count = error_dict.get(error_type, 0)
+                file_error_counts.append(count)
+            
+            file_error_totals.append(file_data.error_stats.total_errors)
+            
+            # Create bars for this file with specific texture
+            hatch = hatch_patterns[i % len(hatch_patterns)]
+            
+            # Use the same color palette as before for errors
+            if len(all_error_types) <= 8:
+                colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
+            else:
+                colors = cm.Set3(np.linspace(0, 1, len(all_error_types)))
+            
+            # For error bars, we'll use the same color for each error type but different textures for files
+            bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
+                          error_bar_width, label=file_data.file_label,
+                          color=colors[:len(all_error_types)], alpha=0.8, 
+                          hatch=hatch, edgecolor='black', linewidth=0.5)
+            
+            # Add value labels on bars (only for non-zero values)
+            for j, (bar, count) in enumerate(zip(bars, file_error_counts)):
+                if count > 0:  # Only label non-zero bars
+                    height = bar.get_height()
+                    ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
+                            f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+        
         ax2.set_ylabel('Error Count')
-        ax2.set_title(f'Combined Error Breakdown by Type - Multiple Files (Total: {combined_error_stats.total_errors})')
-        ax2.set_xticks(range(len(categories)))
-        ax2.set_xticklabels(categories, rotation=45, ha='right')
-        ax2.grid(axis='y', alpha=0.3)
         
-        # Add value labels on bars
-        for bar, count in zip(bars2, counts):
-            ax2.text(bar.get_x() + bar.get_width()/2., count + count*0.01,
-                    f'{count}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        # Create title with per-file error totals
+        error_title_parts = []
+        for file_data, total in zip(file_data_list, file_error_totals):
+            error_title_parts.append(f'{file_data.file_label}: {total}')
+        error_title_suffix = ' | '.join(error_title_parts)
+        ax2.set_title(f'Error Breakdown by Type - Per File\n({error_title_suffix})')
+        
+        ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
+        ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
+        ax2.grid(axis='y', alpha=0.3)
+        ax2.legend(loc='upper right')
     else:
         ax2.text(0.5, 0.5, 'No errors found', 
                 ha='center', va='center', transform=ax2.transAxes, fontsize=14)
-        ax2.set_title('Combined Error Breakdown by Type - Multiple Files')
+        ax2.set_title('Error Breakdown by Type - Multiple Files')
         ax2.set_ylabel('Error Count')
     
     # Optimize spacing between subplots for compact layout
