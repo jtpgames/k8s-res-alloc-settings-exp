@@ -29,6 +29,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+current_memory_allocator=0
+memory_allocator_instances=20
+
 allocate_memory() {
     local cluster_public_ip="$1"
     local initial_memory="$2"
@@ -64,11 +67,14 @@ allocate_memory() {
         local response
         local http_code
         printf "Sending request to allocate %s Mi memory\n" "$memory_to_allocate" >&2
-        response=$(curl -v -X POST "http://$cluster_public_ip/memory-allocator/?memory=$memory_to_allocate" -w "%{http_code}" 2>&1)
+        response=$(curl -v -X POST "http://$cluster_public_ip/memory-allocator-$current_memory_allocator/?memory=$memory_to_allocate" -w "%{http_code}" 2>&1)
         http_code=$(echo "$response" | tail -n1)
 
         # Check if HTTP code is successful (2xx)
         if [[ $http_code -ge 200 && $http_code -lt 300 ]]; then
+            # Increment current_memory_allocator and apply modulo 20
+            current_memory_allocator=$(((current_memory_allocator + 1) % $memory_allocator_instances))
+            
             total_memory=$((total_memory + memory_to_allocate))
             
             if [ "$threshold_exceeded" = "true" ]; then
@@ -314,3 +320,5 @@ echo "show resource usage of workloads after experiment."
 ./get-k8s-resource-usage.sh -n noisy-neighbor
 ./get-k8s-resource-usage.sh -n teastore
 
+kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp | grep -i evict
+kubectl get events -n teastore --sort-by=.metadata.creationTimestamp | grep -i evict
