@@ -1,3 +1,3 @@
 # ---- noise-neighbor variables ---
 
-provisioning_memory_allocator = 30
+provisioning_memory_allocator = 28
