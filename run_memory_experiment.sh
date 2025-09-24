@@ -5,6 +5,10 @@ SKIP_MODULES_MODIFICATION=false
 RUN_TWICE=true
 SKIP_WARMUP=false
 
+# Record experiment start time
+EXPERIMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+echo "Memory experiment started at: $EXPERIMENT_START_TIME"
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -320,5 +324,32 @@ echo "show resource usage of workloads after experiment."
 ./get-k8s-resource-usage.sh -n noisy-neighbor
 ./get-k8s-resource-usage.sh -n teastore
 
-kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp | grep -i evict
-kubectl get events -n teastore --sort-by=.metadata.creationTimestamp | grep -i evict
+# Record experiment end time
+EXPERIMENT_END_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+echo "Memory experiment ended at: $EXPERIMENT_END_TIME"
+echo "Experiment duration: from $EXPERIMENT_START_TIME to $EXPERIMENT_END_TIME"
+
+# Filter events to show only those that occurred during the experiment
+echo "\nFiltering events that occurred during experiment execution..."
+echo "Checking noisy-neighbor namespace events:"
+kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp \
+  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" \
+  | grep -Ei "evict|oomkill|oomkilled|outofmemory" || echo "No relevant events found in noisy-neighbor namespace during experiment"
+
+echo "\nChecking teastore namespace events:"
+kubectl get events -n teastore --sort-by=.metadata.creationTimestamp \
+  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" \
+  | grep -Ei "evict|oomkill|oomkilled|outofmemory" || echo "No relevant events found in teastore namespace during experiment"
+
+# Also show all events during the experiment period for broader context (without grep filter)
+echo "\nAll events during experiment period (noisy-neighbor):"
+kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp \
+  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" || echo "No events found in noisy-neighbor namespace during experiment"
+
+echo "\nAll events during experiment period (teastore):"
+kubectl get events -n teastore --sort-by=.metadata.creationTimestamp \
+  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" || echo "No events found in teastore namespace during experiment"
+
+kubectl describe $(kubectl get pods -n teastore -o name | grep webui) -n teastore
+
+# kubectl exec -it image-5cbdcd7dd5-g9lnc -n teastore -- /bin/bash
