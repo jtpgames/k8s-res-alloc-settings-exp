@@ -234,6 +234,8 @@ def calculate_statistics(response_times: Dict[str, List[float]]) -> pd.DataFrame
                 'Count': len(times)
             })
     
+    if not stats:
+        return pd.DataFrame(columns=['Request Type', 'Average Response Time (ms)', 'Min Response Time (ms)', 'Max Response Time (ms)', 'Count'])
     return pd.DataFrame(stats).sort_values('Average Response Time (ms)', ascending=False)
 
 def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFrame:
