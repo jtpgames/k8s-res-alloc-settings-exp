@@ -308,7 +308,7 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
             colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
         else:
             # Use colormap for many categories
-            colors = cm.Set3(np.linspace(0, 1, len(categories)))
+            colors = plt.colormaps['Set3'](np.linspace(0, 1, len(categories)))
         
         bars2 = ax2.bar(categories, counts, color=colors[:len(categories)], alpha=0.8)
         ax2.set_ylabel('Error Count')
@@ -403,7 +403,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         
         if len(file_data_list) > 8:
             # Use colormap for many categories
-            colors = cm.tab10(np.linspace(0, 1, len(file_data_list)))
+            colors = plt.colormaps['tab10'](np.linspace(0, 1, len(file_data_list)))
 
         for i, file_data in enumerate(file_data_list):
             file_response_times = []
@@ -514,7 +514,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             # Use professional color palette for error types
             error_colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
             if len(all_error_types) > 8:
-                error_colors = cm.tab10(np.linspace(0, 1, len(all_error_types)))
+                error_colors = plt.colormaps['tab10'](np.linspace(0, 1, len(all_error_types)))
             
             # For error bars, we'll use the same color for each error type but different textures for files
             bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
