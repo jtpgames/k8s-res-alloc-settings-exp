@@ -185,6 +185,7 @@ else
     echo "Skipping Training experiment as requested"
     echo ""
 fi
+run_experiment_with_timing "Baseline" --experiment-type baseline
 run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
 run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
 run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
@@ -209,6 +210,7 @@ experiments_run=()
 if [ "$skip_training" = false ]; then
     experiments_run+=("Training")
 fi
+experiments_run+=("Baseline")
 experiments_run+=("CPU Noisy Neighbor (without resources)")
 experiments_run+=("CPU Noisy Neighbor (with resources)")
 experiments_run+=("Memory Noisy Neighbor (without resources)")

@@ -59,8 +59,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     --experiment-type)
       experiment_type="$2"
-      if [[ "$experiment_type" != "training" && "$experiment_type" != "memory-noisy-neighbor" && "$experiment_type" != "cpu-noisy-neighbor" ]]; then
-        echo "Error: Invalid experiment type '$experiment_type'. Valid types are: training, memory-noisy-neighbor, cpu-noisy-neighbor"
+      if [[ "$experiment_type" != "training" && "$experiment_type" != "baseline" && "$experiment_type" != "memory-noisy-neighbor" && "$experiment_type" != "cpu-noisy-neighbor" ]]; then
+        echo "Error: Invalid experiment type '$experiment_type'. Valid types are: training, baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
         exit 1
       fi
       shift # past argument
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --skip-warmup               Skip the warmup phase"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
-      echo "  --experiment-type TYPE      Specify experiment type: training (default), memory-noisy-neighbor, cpu-noisy-neighbor"
+      echo "  --experiment-type TYPE      Specify experiment type: training (default), baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
       echo "  --destroy-cluster           Destroy the Kubernetes cluster at the end"
       echo "  -h, --help                  Show this help message"
       exit 0
@@ -167,6 +167,7 @@ experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*
 echo "Using experiment directory: $experiment_dir"
 
 training_experiment_directory="$root_folder/$experiment_dir/Training_Data"
+baseline_experiment_directory="$root_folder/$experiment_dir/Baseline_Data"
 memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment/$deployment_type"
 cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$deployment_type"
 locust_directory="$root_folder/locust_scripts"
@@ -325,6 +326,9 @@ elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
   ./run_cpu_experiment.sh > "$cpu_log_file" 2>&1 &
   cpu_experiment_pid=$!
   echo "CPU experiment started with PID $cpu_experiment_pid, logging to $cpu_log_file"
+elif [ "$experiment_type" = "baseline" ]; then
+  target_directory="$baseline_experiment_directory/LoadTester_Logs_${START_TIME}"
+  mkdir -pv "$target_directory"
 else
   target_directory="$training_experiment_directory/LoadTester_Logs_${START_TIME}"
   mkdir -pv "$target_directory"
