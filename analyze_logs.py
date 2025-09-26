@@ -303,8 +303,6 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
         categories = list(filtered_errors.keys())
         counts = list(filtered_errors.values())
         
-        # Use a broader color palette for different error types
-        
         # Create a color map with distinct colors
         if len(categories) <= 8:
             colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
@@ -347,11 +345,10 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
     output_file = output_dir / output_filename
     plt.savefig(output_file, format='pdf', bbox_inches='tight')
     typer.echo(f"Chart saved to: {output_file}")
-    
-    # Show the plot
-    # plt.show()
 
-def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path):
+def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path, 
+                                omit_request_count_per_bar_labels: bool = False,
+                                simple_title: bool = False):
     """Create and save bar charts for multiple files using textures to distinguish files."""
     
     # Create figure with subplots - larger size to accommodate multiple files
@@ -374,10 +371,19 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         # Calculate per-file totals for title
         file_totals = []
         
+        # Create a color map with distinct colors
+        if len(file_data_list) <= 8:
+            colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
+        else:
+            # Use colormap for many categories
+            colors = cm.Set3(np.linspace(0, 1, len(file_data_list)))
+
         for i, file_data in enumerate(file_data_list):
             file_response_times = []
             file_request_counts = []
             file_total_requests = 0
+
+            color_to_use = colors[i]
             
             for request_type in all_request_types:
                 if request_type in file_data.response_times and file_data.response_times[request_type]:
@@ -393,35 +399,41 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 file_total_requests += count
             
             file_totals.append(file_total_requests)
+           
             
             # Create bars for this file with specific texture
             hatch = hatch_patterns[i % len(hatch_patterns)]
             bars = ax1.bar(x_positions + i * bar_width, file_response_times, 
                           bar_width, label=file_data.file_label,
-                          color='skyblue', alpha=0.7, hatch=hatch, edgecolor='black', linewidth=0.5)
-            
+                          color=color_to_use, alpha=0.7, hatch=hatch, edgecolor='black', linewidth=0.5)
+           
             # Add value labels on bars
             for j, (bar, avg_time, count) in enumerate(zip(bars, file_response_times, file_request_counts)):
                 if avg_time > 0:  # Only label non-zero bars
                     height = bar.get_height()
                     ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                             f'{avg_time:.0f}ms', ha='center', va='bottom', fontsize=7)
-                    
-                    # Add request count in the middle of the bar
-                    if count > 0:
-                        ax1.text(bar.get_x() + bar.get_width()/2., height/2,
-                                f'{count}', ha='center', va='center', 
-                                fontsize=6, color='black', fontweight='bold')
+                   
+                    if not omit_request_count_per_bar_labels:
+                        # Add request count in the middle of the bar
+                        if count > 0:
+                            ax1.text(bar.get_x() + bar.get_width()/2., height/2,
+                                    f'{count}', ha='center', va='center', 
+                                    fontsize=6, color='black', fontweight='bold')
         
-        ax1.set_xlabel('Request Type')
-        ax1.set_ylabel('Average Response Time (ms)', color='#2980b9')
-        
-        # Create title with per-file request counts
-        title_parts = []
-        for file_data, total in zip(file_data_list, file_totals):
-            title_parts.append(f'{file_data.file_label}: {total:,}')
-        title_suffix = ' | '.join(title_parts)
-        ax1.set_title(f'Average Response Times per Request Type\n({title_suffix})')
+        # ax1.set_xlabel('Request Type')
+        ax1.set_ylabel('Average Response Time (ms)')
+       
+        if not simple_title:
+            # Create title with per-file request counts
+            title_parts = []
+            for file_data, total in zip(file_data_list, file_totals):
+                title_parts.append(f'{file_data.file_label}: {total:,}')
+            title_suffix = ' | '.join(title_parts)
+            title_suffix = f"\n({title_suffix})"
+        else:
+            title_suffix = ""
+        ax1.set_title(f'Average Response Times per Request Type {title_suffix}')
         
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
         ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
@@ -463,7 +475,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             # Create bars for this file with specific texture
             hatch = hatch_patterns[i % len(hatch_patterns)]
             
-            # Use the same color palette as before for errors
+            # Use the same color palette as for single file plot
             if len(all_error_types) <= 8:
                 colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
             else:
@@ -483,13 +495,17 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                             f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
         
         ax2.set_ylabel('Error Count')
-        
-        # Create title with per-file error totals
-        error_title_parts = []
-        for file_data, total in zip(file_data_list, file_error_totals):
-            error_title_parts.append(f'{file_data.file_label}: {total}')
-        error_title_suffix = ' | '.join(error_title_parts)
-        ax2.set_title(f'Error Breakdown by Type - Per File\n({error_title_suffix})')
+
+        if not simple_title:
+            # Create title with per-file error totals
+            error_title_parts = []
+            for file_data, total in zip(file_data_list, file_error_totals):
+                error_title_parts.append(f'{file_data.file_label}: {total}')
+            error_title_suffix = ' | '.join(error_title_parts)
+            error_title_suffix = f"\n({error_title_suffix})"
+        else:
+            error_title_suffix = ""
+        ax2.set_title(f'Error Breakdown by Type - Per File {error_title_suffix}')
         
         ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
         ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
@@ -757,7 +773,7 @@ def analyze(
         
         # Create and save charts
         typer.echo("\nCreating multi-file comparison charts...")
-        create_multi_file_bar_chart(file_data_list, output_dir)
+        create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, simple_title=True)
         
         # Print summary
         print_multi_file_summary(file_data_list)
