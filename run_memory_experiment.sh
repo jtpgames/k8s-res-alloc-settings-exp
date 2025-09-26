@@ -244,24 +244,29 @@ fi
 echo "Cluster-IP: $cluster_public_ip"
 
 if [ "$SKIP_WARMUP" = false ]; then
-  WAIT_MINUTES=5
-  WAIT_SECONDS=$((WAIT_MINUTES * 60))
-
-  echo "Waiting ${WAIT_MINUTES} minutes for TeaStore warmup to finish..."
-
-  for i in $(seq "$WAIT_SECONDS" -1 1); do
-    if [ -t 1 ]; then
-      # stdout is a terminal → overwrite the same line
-      printf "\rTime left: %3ds" "$i"
+  file_path="locust_scripts/locust_log.log"
+  echo "Waiting for TeaStore warmup to finish..."
+  echo "Monitoring $file_path for 'Warm-Up finished' message..."
+  
+  # Loop until we find "Warm-Up finished" in the recent log lines
+  while true; do
+    # Check if the file exists
+    if [[ ! -f "$file_path" ]]; then
+      echo "Waiting for log file '$file_path' to be created..."
+    else
+      # Check the last 50 lines for the warmup message (in case it's not the very last line)
+      if tail -n 50 "$file_path" | grep -q "Warm-Up finished"; then
+        warmup_line=$(tail -n 50 "$file_path" | grep "Warm-Up finished" | tail -n 1)
+        echo "Warmup message detected: $warmup_line"
+        break
+      fi
     fi
-    sleep 1
-  done
 
-  if [ -t 1 ]; then
-    echo -e "\nWarmup finished."
-  else
-    echo "Warmup finished."
-  fi
+    # Sleep for a short period to avoid busy-waiting
+    sleep 2
+  done
+  
+  echo "Warmup finished."
 fi
 
 # Get initial memory usage of memory-allocator pod
@@ -282,7 +287,7 @@ memory_to_allocate=500
 total_memory=$initial_memory_usage
 
 # Call the function and capture the result
-final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "1" "16000" "15000")
+final_memory=$(allocate_memory "$cluster_public_ip" "$initial_memory_usage" "$memory_to_allocate" "3" "16000" "15000")
 echo "First run: final memory allocation: ${final_memory}MiB"
 
 if [ "$RUN_TWICE" = true ]; then
@@ -333,22 +338,18 @@ echo "Experiment duration: from $EXPERIMENT_START_TIME to $EXPERIMENT_END_TIME"
 echo "\nFiltering events that occurred during experiment execution..."
 echo "Checking noisy-neighbor namespace events:"
 kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp \
-  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" \
   | grep -Ei "evict|oomkill|oomkilled|outofmemory" || echo "No relevant events found in noisy-neighbor namespace during experiment"
 
 echo "\nChecking teastore namespace events:"
 kubectl get events -n teastore --sort-by=.metadata.creationTimestamp \
-  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" \
   | grep -Ei "evict|oomkill|oomkilled|outofmemory" || echo "No relevant events found in teastore namespace during experiment"
 
-# Also show all events during the experiment period for broader context (without grep filter)
-echo "\nAll events during experiment period (noisy-neighbor):"
-kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp \
-  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" || echo "No events found in noisy-neighbor namespace during experiment"
+# Also show all recent events for broader context (without grep filter)
+echo "\nAll recent events (noisy-neighbor):"
+kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp || echo "No events found in noisy-neighbor namespace"
 
-echo "\nAll events during experiment period (teastore):"
-kubectl get events -n teastore --sort-by=.metadata.creationTimestamp \
-  --field-selector="firstTimestamp>=$EXPERIMENT_START_TIME,firstTimestamp<=$EXPERIMENT_END_TIME" || echo "No events found in teastore namespace during experiment"
+echo "\nAll recent events (teastore):"
+kubectl get events -n teastore --sort-by=.metadata.creationTimestamp || echo "No events found in teastore namespace"
 
 kubectl describe $(kubectl get pods -n teastore -o name | grep webui) -n teastore
 

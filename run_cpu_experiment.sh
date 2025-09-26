@@ -11,24 +11,29 @@ if [ -z "$cluster_public_ip" ]; then
 fi
 
 if [ "$SKIP_WARMUP" = false ]; then
-  WAIT_MINUTES=5
-  WAIT_SECONDS=$((WAIT_MINUTES * 60))
-
-  echo "Waiting ${WAIT_MINUTES} minutes for TeaStore warmup to finish..."
-
-  for i in $(seq "$WAIT_SECONDS" -1 1); do
-    if [ -t 1 ]; then
-      # stdout is a terminal → overwrite the same line
-      printf "\rTime left: %3ds" "$i"
+  file_path="locust_scripts/locust_log.log"
+  echo "Waiting for TeaStore warmup to finish..."
+  echo "Monitoring $file_path for 'Warm-Up finished' message..."
+  
+  # Loop until we find "Warm-Up finished" in the recent log lines
+  while true; do
+    # Check if the file exists
+    if [[ ! -f "$file_path" ]]; then
+      echo "Waiting for log file '$file_path' to be created..."
+    else
+      # Check the last 50 lines for the warmup message (in case it's not the very last line)
+      if tail -n 50 "$file_path" | grep -q "Warm-Up finished"; then
+        warmup_line=$(tail -n 50 "$file_path" | grep "Warm-Up finished" | tail -n 1)
+        echo "Warmup message detected: $warmup_line"
+        break
+      fi
     fi
-    sleep 1
-  done
 
-  if [ -t 1 ]; then
-    echo -e "\nWarmup finished."
-  else
-    echo "Warmup finished."
-  fi
+    # Sleep for a short period to avoid busy-waiting
+    sleep 2
+  done
+  
+  echo "Warmup finished."
 fi
 
 cpu_to_allocate=100
