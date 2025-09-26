@@ -27,7 +27,7 @@ echo "Creating kubernetes cluster"
 
 # For machine types execute doctl compute size list
 
-doctl kubernetes cluster create k8s-experiments-cluster --region fra1 --version 1.33.1-do.3 --count 2 --size s-8vcpu-16gb --verbose
+doctl kubernetes cluster create k8s-experiments-cluster --region fra1 --version 1.33.1-do.4 --count 2 --size s-8vcpu-16gb --verbose
 
 echo "Kubernetes cluster created, copying kubeconfig to terraform folder"
 
