@@ -171,8 +171,9 @@ memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experi
 cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$deployment_type"
 locust_directory="$root_folder/locust_scripts"
 
-echo "Waiting for 60 seconds for TeaStore to start up"
-sleep 60
+echo "Current time: $(date +'%H:%M:%S')"
+echo "Waiting for 120 seconds for TeaStore to start up"
+sleep 120
 
 # Retry TeaStore status request until all services are OK
 max_retries=20
