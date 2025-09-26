@@ -348,14 +348,41 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
 
 def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path, 
                                 omit_request_count_per_bar_labels: bool = False,
-                                simple_title: bool = False):
+                                simple_title: bool = False,
+                                publication_ready: bool = False,
+                                export_svg: bool = False):
     """Create and save bar charts for multiple files using textures to distinguish files."""
     
-    # Create figure with subplots - larger size to accommodate multiple files
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+    # Set publication-ready styling
+    if publication_ready:
+        plt.rcParams.update({
+            'font.size': 14,
+            'axes.titlesize': 16,
+            'axes.labelsize': 14,
+            'xtick.labelsize': 12,
+            'ytick.labelsize': 12,
+            'legend.fontsize': 12,
+            'font.family': 'serif',
+            'font.serif': ['Times', 'Times New Roman', 'DejaVu Serif'],
+            'mathtext.fontset': 'dejavuserif',
+            # LaTeX text rendering for crisp output
+            'text.usetex': True,
+            'text.latex.preamble': r'\usepackage{times}',
+            'pdf.fonttype': 42,     # TrueType fonts (not bitmap)
+            'ps.fonttype': 42,      # TrueType fonts (not bitmap)
+            'svg.fonttype': 'none', # Keep text as text in SVG
+            'axes.unicode_minus': False,  # Use LaTeX minus sign
+        })
+        figsize = (12, 8)  # Standard column width for papers
+        # figsize = (6.5, 4.5)  # Two-column width (~3.25" per column)
+    else:
+        figsize = (14, 10)
     
-    # Define hatching patterns for different files
-    hatch_patterns = ['', '///', '\\\\', '|||', '---', '+++', 'xxx', '...', 'ooo', '***']
+    # Create figure with subplots - optimized size for papers
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+    
+    # Define hatching patterns for different files - improved for better visibility
+    hatch_patterns = ['', '///', '\\\\', '|||', '---', '+++', 'xxx', 'ooo']
     
     # Collect all request types across all files
     all_request_types = set()
@@ -371,12 +398,12 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         # Calculate per-file totals for title
         file_totals = []
         
-        # Create a color map with distinct colors
-        if len(file_data_list) <= 8:
-            colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
-        else:
+        # Academic-friendly color palette (colorblind safe)
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+        
+        if len(file_data_list) > 8:
             # Use colormap for many categories
-            colors = cm.Set3(np.linspace(0, 1, len(file_data_list)))
+            colors = cm.tab10(np.linspace(0, 1, len(file_data_list)))
 
         for i, file_data in enumerate(file_data_list):
             file_response_times = []
@@ -403,9 +430,12 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             
             # Create bars for this file with specific texture
             hatch = hatch_patterns[i % len(hatch_patterns)]
+            edge_width = 1.0 if publication_ready else 0.5
+            alpha_val = 0.8 if publication_ready else 0.7
             bars = ax1.bar(x_positions + i * bar_width, file_response_times, 
                           bar_width, label=file_data.file_label,
-                          color=color_to_use, alpha=0.7, hatch=hatch, edgecolor='black', linewidth=0.5)
+                          color=color_to_use, alpha=alpha_val, hatch=hatch, 
+                          edgecolor='black', linewidth=edge_width)
            
             # Add value labels on bars
             for j, (bar, avg_time, count) in enumerate(zip(bars, file_response_times, file_request_counts)):
@@ -421,8 +451,8 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                                     f'{count}', ha='center', va='center', 
                                     fontsize=6, color='black', fontweight='bold')
         
-        # ax1.set_xlabel('Request Type')
-        ax1.set_ylabel('Average Response Time (ms)', fontsize=14, fontweight='bold')
+        # ax1.set_xlabel('Request Type', fontweight='bold')
+        ax1.set_ylabel('Average Response Time (ms)', fontweight='bold')
        
         if not simple_title:
             # Create title with per-file request counts
@@ -433,12 +463,17 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             title_suffix = f"\n({title_suffix})"
         else:
             title_suffix = ""
-        ax1.set_title(f'Average Response Times per Request Type {title_suffix}', fontsize=14)
+        ax1.set_title(f'Average Response Times per Request Type {title_suffix}')
         
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
-        ax1.set_xticklabels(all_request_types, rotation=45, ha='right', fontsize=12)
-        ax1.grid(axis='y', alpha=0.3)
-        ax1.legend(loc='upper right', fontsize=12)
+        ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
+        ax1.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
+
+        # Add vertical headroom so legend does not overlap tallest bars
+        ax1.margins(y=0.50)
+        
+        # Improve legend positioning
+        ax1.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
@@ -474,18 +509,18 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             
             # Create bars for this file with specific texture
             hatch = hatch_patterns[i % len(hatch_patterns)]
+            edge_width = 1.0 if publication_ready else 0.5
             
-            # Use the same color palette as for single file plot
-            if len(all_error_types) <= 8:
-                colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
-            else:
-                colors = cm.Set3(np.linspace(0, 1, len(all_error_types)))
+            # Use professional color palette for error types
+            error_colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+            if len(all_error_types) > 8:
+                error_colors = cm.tab10(np.linspace(0, 1, len(all_error_types)))
             
             # For error bars, we'll use the same color for each error type but different textures for files
             bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
                           error_bar_width, label=file_data.file_label,
-                          color=colors[:len(all_error_types)], alpha=0.8, 
-                          hatch=hatch, edgecolor='black', linewidth=0.5)
+                          color=error_colors[:len(all_error_types)], alpha=0.8, 
+                          hatch=hatch, edgecolor='black', linewidth=edge_width)
             
             # Add value labels on bars (only for non-zero values)
             for j, (bar, count) in enumerate(zip(bars, file_error_counts)):
@@ -494,7 +529,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                     ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                             f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
         
-        ax2.set_ylabel('Error Count', fontsize=14, fontweight='bold')
+        ax2.set_ylabel('Error Count', fontweight='bold')
 
         if not simple_title:
             # Create title with per-file error totals
@@ -505,21 +540,30 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             error_title_suffix = f"\n({error_title_suffix})"
         else:
             error_title_suffix = ""
-        ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}', fontsize=14)
+        ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}')
         
         ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
-        ax2.set_xticklabels(all_error_types, rotation=45, ha='right', fontsize=12)
-        ax2.grid(axis='y', alpha=0.3)
-        ax2.legend(loc='upper right', fontsize=12)
+        ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
+        ax2.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
+        
+        # Add vertical headroom so legend does not overlap tallest bars
+        ax2.margins(y=0.15)
+
+        # Improve legend positioning
+        ax2.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
     else:
         ax2.text(0.5, 0.5, 'No errors found', 
-                ha='center', va='center', transform=ax2.transAxes, fontsize=14)
+                ha='center', va='center', transform=ax2.transAxes)
         ax2.set_title('Error Breakdown by Type - Multiple Files')
         ax2.set_ylabel('Error Count')
     
-    # Optimize spacing between subplots for compact layout
-    plt.subplots_adjust(hspace=0.4)
-    plt.tight_layout(pad=1.0)
+    # Optimize spacing between subplots for better readability
+    if publication_ready:
+        plt.subplots_adjust(hspace=0.5)  # More space for publication
+        plt.tight_layout(pad=1.5)  # More padding for cleaner look
+    else:
+        plt.subplots_adjust(hspace=0.4)
+        plt.tight_layout(pad=1.0)
     
     # Generate output filename for multiple files
     if len(file_data_list) == 1:
@@ -531,7 +575,26 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         output_filename = f'multi_file_comparison_{file_labels}.pdf'
     
     output_file = output_dir / output_filename
-    plt.savefig(output_file, format='pdf', bbox_inches='tight')
+    
+    # Save with publication-quality settings optimized for small two-column figures
+    if publication_ready:
+        plt.savefig(output_file, format='pdf', 
+                   bbox_inches='tight',    # Remove extra whitespace
+                   dpi=600,               # Higher DPI for small figures (better text clarity)
+                   facecolor='white',     # Clean background
+                   edgecolor='none',      # No border
+                   pad_inches=0.02,       # Minimal padding for compact layout
+                   transparent=False)     # Solid background for print
+        
+        # Also export SVG for LaTeX if requested
+        if export_svg:
+            svg_file = output_file.with_suffix('.svg')
+            plt.savefig(svg_file, format='svg', bbox_inches='tight',
+                       facecolor='white', edgecolor='none', pad_inches=0.02)
+            typer.echo(f"SVG version saved to: {svg_file}")
+    else:
+        plt.savefig(output_file, format='pdf', bbox_inches='tight')
+    
     typer.echo(f"Multi-file chart saved to: {output_file}")
     
     # Show the plot
@@ -689,7 +752,9 @@ def print_multi_file_summary(file_data_list: List[FileData]):
 @app.command()
 def analyze(
     log_files: List[Path] = typer.Argument(..., help="Path(s) to the locust log file(s) to analyze"),
-    output_dir: Path = typer.Option(None, "--output-dir", "-o", help="Directory to save the chart (defaults to first log file directory)")
+    output_dir: Path = typer.Option(None, "--output-dir", "-o", help="Directory to save the chart (defaults to first log file directory)"),
+    publication_ready: bool = typer.Option(False, "--publication", "-p", help="Generate publication-ready plots with academic styling"),
+    export_svg: bool = typer.Option(False, "--svg", help="Also export SVG format for better LaTeX compatibility")
 ):
     """
     Analyze one or more locust log files and create bar charts showing:
@@ -773,7 +838,9 @@ def analyze(
         
         # Create and save charts
         typer.echo("\nCreating multi-file comparison charts...")
-        create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, simple_title=True)
+        create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, 
+                                   simple_title=True, publication_ready=publication_ready, 
+                                   export_svg=export_svg)
         
         # Print summary
         print_multi_file_summary(file_data_list)
