@@ -412,7 +412,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 if avg_time > 0:  # Only label non-zero bars
                     height = bar.get_height()
                     ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                            f'{avg_time:.0f}ms', ha='center', va='bottom', fontsize=7)
+                            f'{avg_time:.0f}ms', ha='center', va='bottom', fontsize=8, fontweight='bold')
                    
                     if not omit_request_count_per_bar_labels:
                         # Add request count in the middle of the bar
@@ -422,7 +422,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                                     fontsize=6, color='black', fontweight='bold')
         
         # ax1.set_xlabel('Request Type')
-        ax1.set_ylabel('Average Response Time (ms)')
+        ax1.set_ylabel('Average Response Time (ms)', fontsize=14, fontweight='bold')
        
         if not simple_title:
             # Create title with per-file request counts
@@ -433,12 +433,12 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             title_suffix = f"\n({title_suffix})"
         else:
             title_suffix = ""
-        ax1.set_title(f'Average Response Times per Request Type {title_suffix}')
+        ax1.set_title(f'Average Response Times per Request Type {title_suffix}', fontsize=14)
         
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
-        ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
+        ax1.set_xticklabels(all_request_types, rotation=45, ha='right', fontsize=12)
         ax1.grid(axis='y', alpha=0.3)
-        ax1.legend(loc='upper right')
+        ax1.legend(loc='upper right', fontsize=12)
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
@@ -494,7 +494,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                     ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                             f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
         
-        ax2.set_ylabel('Error Count')
+        ax2.set_ylabel('Error Count', fontsize=14, fontweight='bold')
 
         if not simple_title:
             # Create title with per-file error totals
@@ -505,12 +505,12 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             error_title_suffix = f"\n({error_title_suffix})"
         else:
             error_title_suffix = ""
-        ax2.set_title(f'Error Breakdown by Type - Per File {error_title_suffix}')
+        ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}', fontsize=14)
         
         ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
-        ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
+        ax2.set_xticklabels(all_error_types, rotation=45, ha='right', fontsize=12)
         ax2.grid(axis='y', alpha=0.3)
-        ax2.legend(loc='upper right')
+        ax2.legend(loc='upper right', fontsize=12)
     else:
         ax2.text(0.5, 0.5, 'No errors found', 
                 ha='center', va='center', transform=ax2.transAxes, fontsize=14)
