@@ -37,8 +37,8 @@ module "teastore" {
   webui_resources = var.webui_resources
 }
 
-module "noise-neighbor" {
-  source     = "./modules/noise-neighbor"
+module "noisy-neighbor" {
+  source     = "./modules/noisy-neighbor"
   depends_on = [module.teastore]
 
   node = local.nodes.main
@@ -50,4 +50,5 @@ module "noise-neighbor" {
 
   provisioning_cpu_load_generator = var.provisioning_cpu_load_generator
   provisioning_memory_allocator   = var.provisioning_memory_allocator
+  cpu_load_generator_resources    = var.cpu_load_generator_resources
 }

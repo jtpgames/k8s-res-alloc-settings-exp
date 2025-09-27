@@ -41,6 +41,7 @@ function create_and_activate_venv_in_current_dir {
 skip_warmup=false
 experiment_type="training"  # default to training
 teastore_with_resource_configurations=false
+noisy_neighbor_with_resource_configurations=false
 skip_cluster_destruction=true
 
 while [[ $# -gt 0 ]]; do
@@ -51,6 +52,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --ts-with-res-conf)
       teastore_with_resource_configurations=true
+      shift # past argument
+      ;;
+    --nn-with-res-conf)
+      noisy_neighbor_with_resource_configurations=true
       shift # past argument
       ;;
     --destroy-cluster)
@@ -71,6 +76,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --skip-warmup               Skip the warmup phase"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
+      echo "  --nn-with-res-conf          Start noisy neighbor with resource allocation configurations"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
       echo "  --destroy-cluster           Destroy the Kubernetes cluster at the end"
       echo "  -h, --help                  Show this help message"
@@ -120,7 +126,13 @@ fi
 
 echo "Using deployment type: $deployment_type"
 echo "$deployment_type" > "current_deployment_type.txt"
-./deploy.sh "$deployment_type"
+
+# Construct deploy command with additional var file if needed
+if [ "$experiment_type" = "cpu-noisy-neighbor" ] && [ "$noisy_neighbor_with_resource_configurations" = true ]; then
+  ./deploy.sh --additional-var-file "experiment/cpu_load_generator_resources.tfvars" "$deployment_type"
+else
+  ./deploy.sh "$deployment_type"
+fi
 set +e  # back to normal (script won't exit on error anymore)
 
 cd ..

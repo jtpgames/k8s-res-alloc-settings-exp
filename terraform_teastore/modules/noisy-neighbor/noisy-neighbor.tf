@@ -1,4 +1,4 @@
-resource "kubernetes_namespace_v1" "noise-neighbor" {
+resource "kubernetes_namespace_v1" "noisy-neighbor" {
   provider = kubernetes
 
   metadata {
@@ -6,9 +6,9 @@ resource "kubernetes_namespace_v1" "noise-neighbor" {
   }
 }
 
-resource "kubernetes_secret_v1" "noise-neighbor" {
+resource "kubernetes_secret_v1" "noisy-neighbor" {
   provider   = kubernetes
-  depends_on = [kubernetes_namespace_v1.noise-neighbor]
+  depends_on = [kubernetes_namespace_v1.noisy-neighbor]
 
   metadata {
     name      = "regcred"
@@ -22,9 +22,9 @@ resource "kubernetes_secret_v1" "noise-neighbor" {
   type = "kubernetes.io/dockerconfigjson"
 }
 
-resource "kubernetes_default_service_account_v1" "noise-neighbor" {
+resource "kubernetes_default_service_account_v1" "noisy-neighbor" {
   provider   = kubernetes
-  depends_on = [kubernetes_namespace_v1.noise-neighbor]
+  depends_on = [kubernetes_namespace_v1.noisy-neighbor]
 
   metadata {
     namespace = local.namespace

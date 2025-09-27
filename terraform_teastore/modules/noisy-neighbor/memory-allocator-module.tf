@@ -1,5 +1,5 @@
 module "memory-allocator" {
-  depends_on = [kubernetes_default_service_account_v1.noise-neighbor]
+  depends_on = [kubernetes_default_service_account_v1.noisy-neighbor]
   source = "./memory-allocator"
 
   for_each = toset(local.memory_allocator_string_list)

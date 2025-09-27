@@ -4,6 +4,7 @@ set -e  # abort on first error
 # Initialize variables
 SKIP_TEASTORE=false
 DEPLOYMENT_TYPE=""
+ADDITIONAL_VAR_FILE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -12,10 +13,15 @@ while [[ $# -gt 0 ]]; do
             SKIP_TEASTORE=true
             shift
             ;;
+        --additional-var-file)
+            ADDITIONAL_VAR_FILE="$2"
+            shift 2
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS] <deployment-type>"
             echo "Options:"
             echo "  --skip-teastore          Skip TeaStore replacement (only replace noise-neighbor)"
+            echo "  --additional-var-file FILE  Use an additional tfvars file"
             echo "  --help, -h               Show this help message"
             echo ""
             echo "Available deployment types:"
@@ -84,22 +90,29 @@ else
     REPLACEMENTS="$TEASTORE_REPLACEMENTS"
 fi
 
+# Construct additional var file parameter as array
+if [[ -n "$ADDITIONAL_VAR_FILE" ]]; then
+    ADDITIONAL_VAR_FILE_PARAM=("-var-file=$ADDITIONAL_VAR_FILE")
+else
+    ADDITIONAL_VAR_FILE_PARAM=()
+fi
+
 # Select and execute the appropriate terraform apply command based on the argument
 case "$DEPLOYMENT_TYPE" in
     "mem-without-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
+        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
         ;;
     "mem-with-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
+        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
         ;;
     "cpu-without-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
+        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
         ;;
     "cpu-with-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" -replace="module.noise-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
+        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
         ;;
     "default")
-        terraform apply -auto-approve $REPLACEMENTS
+        terraform apply -auto-approve "${ADDITIONAL_VAR_FILE_PARAM[@]}" $REPLACEMENTS
         ;;
 esac
 

@@ -1,6 +1,6 @@
 resource "kubernetes_deployment_v1" "cpu-load-generator" {
   count      = var.provisioning_cpu_load_generator != 0 ? 1 : 0
-  depends_on = [kubernetes_default_service_account_v1.noise-neighbor]
+  depends_on = [kubernetes_default_service_account_v1.noisy-neighbor]
 
   metadata {
     labels = {
@@ -41,9 +41,12 @@ resource "kubernetes_deployment_v1" "cpu-load-generator" {
           name                       = "cpu-load-generator"
 
           resources {
-            requests = {
-              # cpu    = "2m"
-            }
+            limits = var.cpu_load_generator_resources.limits != null ? {
+              cpu = var.cpu_load_generator_resources.limits.cpu
+            } : {}
+            requests = var.cpu_load_generator_resources.requests != null ? {
+              cpu = var.cpu_load_generator_resources.requests.cpu
+            } : {}
           }
         }
       }

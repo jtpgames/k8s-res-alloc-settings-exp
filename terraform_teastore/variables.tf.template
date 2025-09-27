@@ -8,7 +8,7 @@ locals {
   }
 }
 
-# ---- noise-neighbor variables ---
+# ---- noisy-neighbor variables ---
 
 variable "provisioning_cpu_load_generator" {
   type    = number
@@ -18,6 +18,21 @@ variable "provisioning_cpu_load_generator" {
 variable "provisioning_memory_allocator" {
   type    = number
   default = 0
+}
+
+variable "cpu_load_generator_resources" {
+  type = object({
+    limits = object({
+      cpu = string
+    })
+    requests = object({
+      cpu = string
+    })
+  })
+  default = {
+    limits = null
+    requests = null
+  }
 }
 
 # ---- teastore variables ---
