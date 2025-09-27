@@ -12,18 +12,24 @@ handle_interrupt() {
 trap handle_interrupt SIGINT
 
 # Parse command line arguments
-skip_training=false
+experiment_set="all"  # Default to running all experiments
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --skip-training)
-      skip_training=true
+    --experiment-set)
+      experiment_set="$2"
       shift # past argument
+      shift # past value
       ;;
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
-      echo "  --skip-training             Skip the training experiment"
+      echo "  --experiment-set SET        Run specific experiment set:"
+      echo "                                Training - Only run Training experiment"
+      echo "                                Noisy-Neighbor-Problem - Run Baseline, CPU and Memory Noisy Neighbor (without resources)"
+      echo "                                Noisy-Neighbor-Problem-With-Requests - Same as above but with --n-with-res-conf for noisy neighbors"
+      echo "                                Applied-Guidelines - Run CPU and Memory Noisy Neighbor (with resources)"
+      echo "                                all (default) - Run all experiments"
       echo "  -h, --help                  Show this help message"
       exit 0
       ;;
@@ -34,6 +40,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Validate experiment set
+case "$experiment_set" in
+    "Training"|"Noisy-Neighbor-Problem"|"Noisy-Neighbor-Problem-With-Requests"|"Applied-Guidelines"|"all")
+        # Valid experiment set
+        ;;
+    *)
+        echo "Error: Invalid experiment set '$experiment_set'"
+        echo "Valid options: Training, Noisy-Neighbor-Problem, Noisy-Neighbor-Problem-With-Requests, Applied-Guidelines, all"
+        exit 1
+        ;;
+esac
 
 # Function to check if required tools are available
 check_required_tools() {
@@ -172,24 +190,42 @@ declare -A experiment_log_files
 # Record overall start time
 overall_start_time=$(date +%s)
 
-echo "Starting all TeaStore experiments at $(date)"
-if [ "$skip_training" = true ]; then
-    echo "Note: Training experiment will be skipped (--skip-training flag provided)"
-fi
+echo "Starting TeaStore experiments (set: $experiment_set) at $(date)"
 echo ""
 
-# Run experiments with timing
-if [ "$skip_training" = false ]; then
-    run_experiment_with_timing "Training" --experiment-type training
-else
-    echo "Skipping Training experiment as requested"
-    echo ""
-fi
-run_experiment_with_timing "Baseline" --experiment-type baseline
-run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
-run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
-run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
-run_experiment_with_timing "Memory Noisy Neighbor (with resources)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
+# Run experiments based on selected set
+case "$experiment_set" in
+    "Training")
+        echo "Running Training experiment set"
+        run_experiment_with_timing "Training" --experiment-type training
+        ;;
+    "Noisy-Neighbor-Problem")
+        echo "Running Noisy-Neighbor-Problem experiment set"
+        run_experiment_with_timing "Baseline" --experiment-type baseline
+        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
+        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
+        ;;
+    "Noisy-Neighbor-Problem-With-Requests")
+        echo "Running Noisy-Neighbor-Problem-With-Requests experiment set"
+        run_experiment_with_timing "Baseline" --experiment-type baseline
+        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor --n-with-res-conf
+        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor --n-with-res-conf
+        ;;
+    "Applied-Guidelines")
+        echo "Running Applied-Guidelines experiment set"
+        run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
+        run_experiment_with_timing "Memory Noisy Neighbor (with resources)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
+        ;;
+    "all")
+        echo "Running all experiments"
+        run_experiment_with_timing "Training" --experiment-type training
+        run_experiment_with_timing "Baseline" --experiment-type baseline
+        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
+        run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
+        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
+        run_experiment_with_timing "Memory Noisy Neighbor (with resources)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
+        ;;
+esac
 
 # Calculate overall duration
 overall_end_time=$(date +%s)
@@ -207,14 +243,33 @@ echo "Individual experiment times:"
 
 # Build experiment list based on what was actually run
 experiments_run=()
-if [ "$skip_training" = false ]; then
-    experiments_run+=("Training")
-fi
-experiments_run+=("Baseline")
-experiments_run+=("CPU Noisy Neighbor (without resources)")
-experiments_run+=("CPU Noisy Neighbor (with resources)")
-experiments_run+=("Memory Noisy Neighbor (without resources)")
-experiments_run+=("Memory Noisy Neighbor (with resources)")
+case "$experiment_set" in
+    "Training")
+        experiments_run+=("Training")
+        ;;
+    "Noisy-Neighbor-Problem")
+        experiments_run+=("Baseline")
+        experiments_run+=("CPU Noisy Neighbor (without resources)")
+        experiments_run+=("Memory Noisy Neighbor (without resources)")
+        ;;
+    "Noisy-Neighbor-Problem-With-Requests")
+        experiments_run+=("Baseline")
+        experiments_run+=("CPU Noisy Neighbor (without resources)")
+        experiments_run+=("Memory Noisy Neighbor (without resources)")
+        ;;
+    "Applied-Guidelines")
+        experiments_run+=("CPU Noisy Neighbor (with resources)")
+        experiments_run+=("Memory Noisy Neighbor (with resources)")
+        ;;
+    "all")
+        experiments_run+=("Training")
+        experiments_run+=("Baseline")
+        experiments_run+=("CPU Noisy Neighbor (without resources)")
+        experiments_run+=("CPU Noisy Neighbor (with resources)")
+        experiments_run+=("Memory Noisy Neighbor (without resources)")
+        experiments_run+=("Memory Noisy Neighbor (with resources)")
+        ;;
+esac
 
 # Display results for experiments that were actually run
 for experiment in "${experiments_run[@]}"; do
@@ -226,10 +281,32 @@ for experiment in "${experiments_run[@]}"; do
     echo "    Log file: $log_file"
 done
 
-# Show skipped experiments
-if [ "$skip_training" = true ]; then
-    echo "  Training: SKIPPED"
-fi
+# Show what experiments are not included in the current set
+case "$experiment_set" in
+    "Training")
+        echo "  Baseline: NOT IN SET"
+        echo "  CPU Noisy Neighbor (without resources): NOT IN SET"
+        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
+        echo "  Memory Noisy Neighbor (without resources): NOT IN SET"
+        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
+        ;;
+    "Noisy-Neighbor-Problem")
+        echo "  Training: NOT IN SET"
+        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
+        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
+        ;;
+    "Noisy-Neighbor-Problem-With-Requests")
+        echo "  Training: NOT IN SET"
+        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
+        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
+        ;;
+    "Applied-Guidelines")
+        echo "  Training: NOT IN SET"
+        echo "  Baseline: NOT IN SET"
+        echo "  CPU Noisy Neighbor (without resources): NOT IN SET"
+        echo "  Memory Noisy Neighbor (without resources): NOT IN SET"
+        ;;
+esac
 
 echo ""
 echo "Log files created:"
