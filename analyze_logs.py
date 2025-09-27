@@ -221,21 +221,31 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats]
     return dict(response_times), error_stats
 
 def calculate_statistics(response_times: Dict[str, List[float]]) -> pd.DataFrame:
-    """Calculate average response times for each request type (single file)."""
+    """Calculate average and median response times for each request type (single file)."""
     stats = []
     
     for request_type, times in response_times.items():
         if times:  # Only process if there are response times
+            sorted_times = sorted(times)
+            n = len(sorted_times)
+            
+            # Calculate median
+            if n % 2 == 0:
+                median_time = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
+            else:
+                median_time = sorted_times[n//2]
+            
             stats.append({
                 'Request Type': request_type,
                 'Average Response Time (ms)': sum(times) / len(times),
+                'Median Response Time (ms)': median_time,
                 'Min Response Time (ms)': min(times),
                 'Max Response Time (ms)': max(times),
                 'Count': len(times)
             })
     
     if not stats:
-        return pd.DataFrame(columns=['Request Type', 'Average Response Time (ms)', 'Min Response Time (ms)', 'Max Response Time (ms)', 'Count'])
+        return pd.DataFrame(columns=['Request Type', 'Average Response Time (ms)', 'Median Response Time (ms)', 'Min Response Time (ms)', 'Max Response Time (ms)', 'Count'])
     return pd.DataFrame(stats).sort_values('Average Response Time (ms)', ascending=False)
 
 def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFrame:
@@ -245,10 +255,20 @@ def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFr
     for file_data in file_data_list:
         for request_type, times in file_data.response_times.items():
             if times:  # Only process if there are response times
+                sorted_times = sorted(times)
+                n = len(sorted_times)
+                
+                # Calculate median
+                if n % 2 == 0:
+                    median_time = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
+                else:
+                    median_time = sorted_times[n//2]
+                
                 all_stats.append({
                     'Request Type': request_type,
                     'File': file_data.file_label,
                     'Average Response Time (ms)': sum(times) / len(times),
+                    'Median Response Time (ms)': median_time,
                     'Min Response Time (ms)': min(times),
                     'Max Response Time (ms)': max(times),
                     'Count': len(times)
@@ -256,23 +276,26 @@ def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFr
     
     return pd.DataFrame(all_stats).sort_values(['Request Type', 'File'])
 
-def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir: Path, log_file: Path):
+def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir: Path, log_file: Path, metric_type: str = "average"):
     """Create and save bar charts for response times and error count (single file)."""
     
     # Create figure with subplots - optimized size for compact layout
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
     
-    # Plot 1: Average Response Times by Request Type
+    # Plot 1: Response Times by Request Type
     if not stats_df.empty:
         # Calculate total request count for title
         total_requests = stats_df['Count'].sum()
         
+        # Select the appropriate metric column
+        metric_column = f'{metric_type.title()} Response Time (ms)'
+        
         # Create the primary bars for response times
-        bars1 = ax1.bar(range(len(stats_df)), stats_df['Average Response Time (ms)'], 
+        bars1 = ax1.bar(range(len(stats_df)), stats_df[metric_column], 
                        color='skyblue', alpha=0.7)
         ax1.set_xlabel('Request Type')
-        ax1.set_ylabel('Average Response Time (ms)', color='#2980b9')
-        ax1.set_title(f'Average Response Times per Request Type (Total Requests: {total_requests:,})')
+        ax1.set_ylabel(f'{metric_type.title()} Response Time (ms)', color='#2980b9')
+        ax1.set_title(f'{metric_type.title()} Response Times per Request Type (Total Requests: {total_requests:,})')
         ax1.set_xticks(range(len(stats_df)))
         ax1.set_xticklabels(stats_df['Request Type'], rotation=45, ha='right')
         ax1.grid(axis='y', alpha=0.3)
@@ -292,7 +315,7 @@ def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
-        ax1.set_title('Average Response Times per Request Type')
+        ax1.set_title(f'{metric_type.title()} Response Times per Request Type')
     
     # Plot 2: Error Breakdown by Type
     error_dict = error_stats.to_dict()
@@ -350,7 +373,8 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                                 omit_request_count_per_bar_labels: bool = False,
                                 simple_title: bool = False,
                                 publication_ready: bool = False,
-                                export_svg: bool = False):
+                                export_svg: bool = False,
+                                metric_type: str = "average"):
     """Create and save bar charts for multiple files using textures to distinguish files."""
     
     # Set publication-ready styling
@@ -390,7 +414,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         all_request_types.update(file_data.response_times.keys())
     all_request_types = sorted(all_request_types)
     
-    # Plot 1: Average Response Times by Request Type (Multiple Files)
+    # Plot 1: Response Times by Request Type (Multiple Files)
     if all_request_types:
         bar_width = 0.8 / len(file_data_list)  # Width of each bar group
         x_positions = np.arange(len(all_request_types))
@@ -415,13 +439,23 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             for request_type in all_request_types:
                 if request_type in file_data.response_times and file_data.response_times[request_type]:
                     times = file_data.response_times[request_type]
-                    avg_time = sum(times) / len(times)
                     count = len(times)
+                    
+                    # Calculate the selected metric
+                    if metric_type.lower() == 'median':
+                        sorted_times = sorted(times)
+                        n = len(sorted_times)
+                        if n % 2 == 0:
+                            response_time_value = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
+                        else:
+                            response_time_value = sorted_times[n//2]
+                    else:  # average
+                        response_time_value = sum(times) / len(times)
                 else:
-                    avg_time = 0
+                    response_time_value = 0
                     count = 0
                 
-                file_response_times.append(avg_time)
+                file_response_times.append(response_time_value)
                 file_request_counts.append(count)
                 file_total_requests += count
             
@@ -438,11 +472,11 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                           edgecolor='black', linewidth=edge_width)
            
             # Add value labels on bars
-            for j, (bar, avg_time, count) in enumerate(zip(bars, file_response_times, file_request_counts)):
-                if avg_time > 0:  # Only label non-zero bars
+            for j, (bar, response_time, count) in enumerate(zip(bars, file_response_times, file_request_counts)):
+                if response_time > 0:  # Only label non-zero bars
                     height = bar.get_height()
                     ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                            f'{avg_time:.0f}ms', ha='center', va='bottom', fontsize=8, fontweight='bold')
+                            f'{response_time:.0f}ms', ha='center', va='bottom', fontsize=8, fontweight='bold')
                    
                     if not omit_request_count_per_bar_labels:
                         # Add request count in the middle of the bar
@@ -452,7 +486,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                                     fontsize=6, color='black', fontweight='bold')
         
         # ax1.set_xlabel('Request Type', fontweight='bold')
-        ax1.set_ylabel('Average Response Time (ms)', fontweight='bold')
+        ax1.set_ylabel(f'{metric_type.title()} Response Time (ms)', fontweight='bold')
        
         if not simple_title:
             # Create title with per-file request counts
@@ -463,7 +497,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             title_suffix = f"\n({title_suffix})"
         else:
             title_suffix = ""
-        ax1.set_title(f'Average Response Times per Request Type {title_suffix}')
+        ax1.set_title(f'{metric_type.title()} Response Times per Request Type {title_suffix}')
         
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
         ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
@@ -477,7 +511,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
-        ax1.set_title('Average Response Times per Request Type - Multiple Files')
+        ax1.set_title(f'{metric_type.title()} Response Times per Request Type - Multiple Files')
     
     # Plot 2: Error Breakdown by Type (Per File with Textures)
     # Collect all error types across all files
@@ -600,7 +634,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
     # Show the plot
     # plt.show()
 
-def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
+def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats, metric_type: str = "average"):
     """Print a summary of the analysis results (single file)."""
     """Print a summary of the analysis results."""
     typer.echo("\n" + "="*60)
@@ -611,13 +645,20 @@ def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
         total_requests = stats_df['Count'].sum()
         typer.echo(f"\nFound {len(stats_df)} different request types:")
         typer.echo(f"Total Requests Processed: {total_requests:,}")
-        typer.echo("\nResponse Time Statistics:")
+        typer.echo(f"\nResponse Time Statistics (📈 {metric_type.title()} metric highlighted for plotting):")
         typer.echo(stats_df.to_string(index=False, float_format='%.2f'))
         
-        typer.echo(f"\nTop 3 slowest request types:")
-        for i, row in stats_df.head(3).iterrows():
-            typer.echo(f"  {i+1}. {row['Request Type']}: {row['Average Response Time (ms)']:.2f}ms "
-                      f"(Count: {row['Count']})")
+        # Sort by the selected metric for the "slowest" display
+        metric_column = f'{metric_type.title()} Response Time (ms)'
+        sorted_stats = stats_df.sort_values(metric_column, ascending=False)
+        
+        typer.echo(f"\nTop 3 slowest request types (by {metric_type}):")
+        for i, row in sorted_stats.head(3).iterrows():
+            avg_time = row['Average Response Time (ms)']
+            med_time = row['Median Response Time (ms)']
+            selected_time = row[metric_column]
+            typer.echo(f"  {i+1}. {row['Request Type']}: {selected_time:.2f}ms [{metric_type}] "
+                      f"(avg: {avg_time:.2f}ms, median: {med_time:.2f}ms, count: {row['Count']})")
     else:
         typer.echo("\nNo response time data found in the log file.")
     
@@ -675,10 +716,11 @@ def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats):
     else:
         typer.echo("\n✅ No errors found in the log file.")
 
-def print_multi_file_summary(file_data_list: List[FileData]):
+def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = "average"):
     """Print a summary of the analysis results for multiple files."""
     typer.echo("\n" + "="*80)
     typer.echo("MULTI-FILE LOCUST LOG ANALYSIS SUMMARY")
+    typer.echo(f"📈 Using {metric_type.title()} Response Times for Charts")
     typer.echo("="*80)
     
     # Summary for each file
@@ -694,11 +736,16 @@ def print_multi_file_summary(file_data_list: List[FileData]):
             typer.echo(f"Request Types: {len(stats_df)}")
             typer.echo(f"Total Requests: {total_requests:,}")
             
-            # Show top 3 slowest for this file
-            typer.echo(f"Top 3 slowest request types:")
-            for j, row in stats_df.head(3).iterrows():
-                typer.echo(f"  {j+1}. {row['Request Type']}: {row['Average Response Time (ms)']:.2f}ms "
-                          f"(Count: {row['Count']})")
+            # Show top 3 slowest for this file by the selected metric
+            metric_column = f'{metric_type.title()} Response Time (ms)'
+            sorted_stats = stats_df.sort_values(metric_column, ascending=False)
+            typer.echo(f"Top 3 slowest request types (by {metric_type}):")
+            for j, row in sorted_stats.head(3).iterrows():
+                avg_time = row['Average Response Time (ms)']
+                med_time = row['Median Response Time (ms)']
+                selected_time = row[metric_column]
+                typer.echo(f"  {j+1}. {row['Request Type']}: {selected_time:.2f}ms [{metric_type}] "
+                          f"(avg: {avg_time:.2f}ms, median: {med_time:.2f}ms, count: {row['Count']})")
         else:
             typer.echo("No response time data found.")
             total_requests = 0
@@ -754,11 +801,12 @@ def analyze(
     log_files: List[Path] = typer.Argument(..., help="Path(s) to the locust log file(s) to analyze"),
     output_dir: Path = typer.Option(None, "--output-dir", "-o", help="Directory to save the chart (defaults to first log file directory)"),
     publication_ready: bool = typer.Option(False, "--publication", "-p", help="Generate publication-ready plots with academic styling"),
-    export_svg: bool = typer.Option(False, "--svg", help="Also export SVG format for better LaTeX compatibility")
+    export_svg: bool = typer.Option(False, "--svg", help="Also export SVG format for better LaTeX compatibility"),
+    metric_type: str = typer.Option("average", "--metric-type", "-m", help="Response time metric to plot ('average' or 'median')", case_sensitive=False)
 ):
     """
     Analyze one or more locust log files and create bar charts showing:
-    1. Average response times per request type (with request counts displayed)
+    1. Average or median response times per request type (with request counts displayed)
     2. Total number of errors by category
     
     When multiple files are provided, data from all files will be plotted
@@ -767,7 +815,14 @@ def analyze(
     The response time chart now includes:
     - Total request count in the title
     - Individual request counts displayed within each bar
+    - Option to choose between average and median response times
     """
+    
+    # Validate metric type
+    metric_type_lower = metric_type.lower()
+    if metric_type_lower not in ['average', 'median']:
+        typer.echo(f"Error: Invalid metric type '{metric_type}'. Must be 'average' or 'median'.", err=True)
+        raise typer.Exit(1)
     
     # Validate input files
     for log_file in log_files:
@@ -808,10 +863,10 @@ def analyze(
         
         # Create and save charts
         typer.echo("Creating charts...")
-        create_bar_chart(stats_df, error_stats, output_dir, log_file)
+        create_bar_chart(stats_df, error_stats, output_dir, log_file, metric_type_lower)
         
         # Print summary
-        print_summary(stats_df, error_stats)
+        print_summary(stats_df, error_stats, metric_type_lower)
         
     else:
         # Multiple files - use new logic
@@ -840,10 +895,10 @@ def analyze(
         typer.echo("\nCreating multi-file comparison charts...")
         create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, 
                                    simple_title=True, publication_ready=publication_ready, 
-                                   export_svg=export_svg)
+                                   export_svg=export_svg, metric_type=metric_type_lower)
         
         # Print summary
-        print_multi_file_summary(file_data_list)
+        print_multi_file_summary(file_data_list, metric_type_lower)
     
     typer.echo(f"\n✅ Analysis complete! Results saved to {output_dir}")
 
