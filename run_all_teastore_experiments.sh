@@ -209,7 +209,7 @@ case "$experiment_set" in
         echo "Running Noisy-Neighbor-Problem-With-Requests experiment set"
         run_experiment_with_timing "Baseline" --experiment-type baseline
         run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor --n-with-res-conf
-        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor --n-with-res-conf
+        # run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor --n-with-res-conf
         ;;
     "Applied-Guidelines")
         echo "Running Applied-Guidelines experiment set"
