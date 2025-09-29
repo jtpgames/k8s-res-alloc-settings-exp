@@ -377,6 +377,10 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                                 metric_type: str = "average"):
     """Create and save bar charts for multiple files using textures to distinguish files."""
     
+    # Check if there are any errors across all files
+    total_errors_across_files = sum(file_data.error_stats.total_errors for file_data in file_data_list)
+    has_errors = total_errors_across_files > 0
+    
     # Set publication-ready styling
     if publication_ready:
         plt.rcParams.update({
@@ -397,13 +401,22 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             'svg.fonttype': 'none', # Keep text as text in SVG
             'axes.unicode_minus': False,  # Use LaTeX minus sign
         })
-        figsize = (12, 8)  # Standard column width for papers
-        # figsize = (6.5, 4.5)  # Two-column width (~3.25" per column)
+        # Adjust figure size based on whether we have errors
+        if has_errors:
+            figsize = (12, 8)  # Standard two-subplot size
+        else:
+            figsize = (12, 5)  # Smaller height for single subplot
     else:
-        figsize = (14, 10)
+        if has_errors:
+            figsize = (14, 10)  # Standard two-subplot size
+        else:
+            figsize = (14, 6)   # Smaller height for single subplot
     
-    # Create figure with subplots - optimized size for papers
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+    # Create figure with appropriate subplot layout
+    if has_errors:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+    else:
+        fig, ax1 = plt.subplots(1, 1, figsize=figsize)
     
     # Define hatching patterns for different files - improved for better visibility
     hatch_patterns = ['', '///', '\\\\', '|||', '---', '+++', 'xxx', 'ooo']
@@ -513,91 +526,94 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 ha='center', va='center', transform=ax1.transAxes)
         ax1.set_title(f'{metric_type.title()} Response Times per Request Type - Multiple Files')
     
-    # Plot 2: Error Breakdown by Type (Per File with Textures)
-    # Collect all error types across all files
-    all_error_types = set()
-    for file_data in file_data_list:
-        error_dict = file_data.error_stats.to_dict()
-        filtered_errors = {k: v for k, v in error_dict.items() if v > 0}
-        all_error_types.update(filtered_errors.keys())
-    
-    all_error_types = sorted(all_error_types)
-    
-    if all_error_types:
-        error_bar_width = 0.8 / len(file_data_list)  # Width of each error bar group
-        error_x_positions = np.arange(len(all_error_types))
-        
-        # Calculate total errors per file for title
-        file_error_totals = []
-        
-        for i, file_data in enumerate(file_data_list):
-            file_error_counts = []
-            
-            # Get error counts for this file for each error type
+    # Plot 2: Error Breakdown by Type (Per File with Textures) - Only if there are errors
+    if has_errors:
+        # Collect all error types across all files
+        all_error_types = set()
+        for file_data in file_data_list:
             error_dict = file_data.error_stats.to_dict()
-            for error_type in all_error_types:
-                count = error_dict.get(error_type, 0)
-                file_error_counts.append(count)
-            
-            file_error_totals.append(file_data.error_stats.total_errors)
-            
-            # Create bars for this file with specific texture
-            hatch = hatch_patterns[i % len(hatch_patterns)]
-            edge_width = 1.0 if publication_ready else 0.5
-            
-            # Use professional color palette for error types
-            error_colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
-            if len(all_error_types) > 8:
-                error_colors = plt.colormaps['tab10'](np.linspace(0, 1, len(all_error_types)))
-            
-            # For error bars, we'll use the same color for each error type but different textures for files
-            bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
-                          error_bar_width, label=file_data.file_label,
-                          color=error_colors[:len(all_error_types)], alpha=0.8, 
-                          hatch=hatch, edgecolor='black', linewidth=edge_width)
-            
-            # Add value labels on bars (only for non-zero values)
-            for j, (bar, count) in enumerate(zip(bars, file_error_counts)):
-                if count > 0:  # Only label non-zero bars
-                    height = bar.get_height()
-                    ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                            f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+            filtered_errors = {k: v for k, v in error_dict.items() if v > 0}
+            all_error_types.update(filtered_errors.keys())
         
-        ax2.set_ylabel('Error Count', fontweight='bold')
+        all_error_types = sorted(all_error_types)
+        
+        if all_error_types:
+            error_bar_width = 0.8 / len(file_data_list)  # Width of each error bar group
+            error_x_positions = np.arange(len(all_error_types))
+            
+            # Calculate total errors per file for title
+            file_error_totals = []
+            
+            for i, file_data in enumerate(file_data_list):
+                file_error_counts = []
+                
+                # Get error counts for this file for each error type
+                error_dict = file_data.error_stats.to_dict()
+                for error_type in all_error_types:
+                    count = error_dict.get(error_type, 0)
+                    file_error_counts.append(count)
+                
+                file_error_totals.append(file_data.error_stats.total_errors)
+                
+                # Create bars for this file with specific texture
+                hatch = hatch_patterns[i % len(hatch_patterns)]
+                edge_width = 1.0 if publication_ready else 0.5
+                
+                # Use professional color palette for error types
+                error_colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+                if len(all_error_types) > 8:
+                    error_colors = plt.colormaps['tab10'](np.linspace(0, 1, len(all_error_types)))
+                
+                # For error bars, we'll use the same color for each error type but different textures for files
+                bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
+                              error_bar_width, label=file_data.file_label,
+                              color=error_colors[:len(all_error_types)], alpha=0.8, 
+                              hatch=hatch, edgecolor='black', linewidth=edge_width)
+                
+                # Add value labels on bars (only for non-zero values)
+                for j, (bar, count) in enumerate(zip(bars, file_error_counts)):
+                    if count > 0:  # Only label non-zero bars
+                        height = bar.get_height()
+                        ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
+                                f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+            
+            ax2.set_ylabel('Error Count', fontweight='bold')
 
-        if not simple_title:
-            # Create title with per-file error totals
-            error_title_parts = []
-            for file_data, total in zip(file_data_list, file_error_totals):
-                error_title_parts.append(f'{file_data.file_label}: {total}')
-            error_title_suffix = ' | '.join(error_title_parts)
-            error_title_suffix = f"\n({error_title_suffix})"
-        else:
-            error_title_suffix = ""
-        ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}')
-        
-        ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
-        ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
-        ax2.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
-        
-        # Add vertical headroom so legend does not overlap tallest bars
-        ax2.margins(y=0.15)
+            if not simple_title:
+                # Create title with per-file error totals
+                error_title_parts = []
+                for file_data, total in zip(file_data_list, file_error_totals):
+                    error_title_parts.append(f'{file_data.file_label}: {total}')
+                error_title_suffix = ' | '.join(error_title_parts)
+                error_title_suffix = f"\n({error_title_suffix})"
+            else:
+                error_title_suffix = ""
+            ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}')
+            
+            ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
+            ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
+            ax2.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
+            
+            # Add vertical headroom so legend does not overlap tallest bars
+            ax2.margins(y=0.15)
 
-        # Improve legend positioning
-        ax2.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
-    else:
-        ax2.text(0.5, 0.5, 'No errors found', 
-                ha='center', va='center', transform=ax2.transAxes)
-        ax2.set_title('Error Breakdown by Type - Multiple Files')
-        ax2.set_ylabel('Error Count')
+            # Improve legend positioning
+            ax2.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
     
-    # Optimize spacing between subplots for better readability
-    if publication_ready:
-        plt.subplots_adjust(hspace=0.5)  # More space for publication
-        plt.tight_layout(pad=1.5)  # More padding for cleaner look
+    # Optimize spacing between subplots for better readability (only if we have multiple subplots)
+    if has_errors:
+        if publication_ready:
+            plt.subplots_adjust(hspace=0.5)  # More space for publication
+            plt.tight_layout(pad=1.5)  # More padding for cleaner look
+        else:
+            plt.subplots_adjust(hspace=0.4)
+            plt.tight_layout(pad=1.0)
     else:
-        plt.subplots_adjust(hspace=0.4)
-        plt.tight_layout(pad=1.0)
+        # Single subplot, just use tight_layout
+        if publication_ready:
+            plt.tight_layout(pad=1.5)
+        else:
+            plt.tight_layout(pad=1.0)
     
     # Generate output filename for multiple files
     if len(file_data_list) == 1:
