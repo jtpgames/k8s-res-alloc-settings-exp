@@ -1,8 +1,11 @@
 # This file can be used in addition to other tfvars files using multiple -var-file options
 
-cpu_load_generator_resources = {
+webui_resources = {
   requests = {
-    cpu = "1m"
+    cpu = "100m"
+    memory = "1500Mi"
   }
-  limits = null
+  limits = {
+    memory = "1500Mi"
+  }
 }
