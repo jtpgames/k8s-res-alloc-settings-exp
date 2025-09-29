@@ -17,9 +17,8 @@ import re
 import typer
 from pathlib import Path
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -100,6 +99,7 @@ def parse_multiple_log_files(log_files: List[Path]) -> List[FileData]:
         List of FileData objects containing parsed data from each file
     """
     file_data_list = []
+    used_labels = {}  # Track how many times each label has been used
     
     for log_file in log_files:
         typer.echo(f"Parsing {log_file.name}...")
@@ -108,10 +108,18 @@ def parse_multiple_log_files(log_files: List[Path]) -> List[FileData]:
         # Create a human-readable label using experiment type
         try:
             experiment_type = log_file.parent.parent.name
-            file_label = experiment_type
+            base_file_label = experiment_type
         except (AttributeError, IndexError):
             # Fallback to filename if we can't determine experiment type
-            file_label = log_file.stem
+            base_file_label = log_file.stem
+        
+        # Handle duplicate labels by adding numeric postfixes
+        if base_file_label in used_labels:
+            used_labels[base_file_label] += 1
+            file_label = f"{base_file_label}-{used_labels[base_file_label]}"
+        else:
+            used_labels[base_file_label] = 0
+            file_label = base_file_label
         
         file_data = FileData(
             file_path=log_file,
