@@ -12,25 +12,33 @@ handle_interrupt() {
 trap handle_interrupt SIGINT
 
 # Parse command line arguments
-experiment_set="all"  # Default to running all experiments
+experiment_sets=("all")  # Default to running all experiments
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --experiment-set)
-      experiment_set="$2"
+      # If this is the first --experiment-set argument, clear the default
+      if [[ "${experiment_sets[0]}" == "all" && ${#experiment_sets[@]} -eq 1 ]]; then
+        experiment_sets=()
+      fi
+      experiment_sets+=("$2")
       shift # past argument
       shift # past value
       ;;
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
-      echo "  --experiment-set SET        Run specific experiment set:"
+      echo "  --experiment-set SET        Run specific experiment set (can be used multiple times)"
       echo "                                Training - Only run Training experiment"
-      echo "                                Noisy-Neighbor-Problem - Run Baseline, CPU and Memory Noisy Neighbor (without resources)"
+      echo "                                Noisy-Neighbor-Problem - Run Baseline, CPU and Memory Noisy Neighbor (ts without res conf)"
       echo "                                Noisy-Neighbor-Problem-With-Requests - Same as above but with --n-with-res-conf for noisy neighbors"
-      echo "                                Applied-Guidelines - Run CPU and Memory Noisy Neighbor (with resources)"
-      echo "                                all (default) - Run all experiments"
+      echo "                                Applied-Guidelines - Run CPU and Memory Noisy Neighbor (ts with res conf)"
+      echo "                                all (default) - Run all experiments except Training"
       echo "  -h, --help                  Show this help message"
+      echo ""
+      echo "Examples:"
+      echo "  $0 --experiment-set Training --experiment-set Applied-Guidelines"
+      echo "  $0 --experiment-set Noisy-Neighbor-Problem"
       exit 0
       ;;
     *)
@@ -41,17 +49,37 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Validate experiment set
-case "$experiment_set" in
-    "Training"|"Noisy-Neighbor-Problem"|"Noisy-Neighbor-Problem-With-Requests"|"Applied-Guidelines"|"all")
-        # Valid experiment set
-        ;;
-    *)
-        echo "Error: Invalid experiment set '$experiment_set'"
-        echo "Valid options: Training, Noisy-Neighbor-Problem, Noisy-Neighbor-Problem-With-Requests, Applied-Guidelines, all"
-        exit 1
-        ;;
-esac
+# Validate experiment sets
+valid_sets=("Training" "Noisy-Neighbor-Problem" "Noisy-Neighbor-Problem-With-Requests" "Applied-Guidelines" "all")
+for experiment_set in "${experiment_sets[@]}"; do
+  is_valid=false
+  for valid_set in "${valid_sets[@]}"; do
+    if [[ "$experiment_set" == "$valid_set" ]]; then
+      is_valid=true
+      break
+    fi
+  done
+  
+  if [[ "$is_valid" == "false" ]]; then
+    echo "Error: Invalid experiment set '$experiment_set'"
+    echo "Valid options: Training, Noisy-Neighbor-Problem, Noisy-Neighbor-Problem-With-Requests, Applied-Guidelines, all"
+    exit 1
+  fi
+done
+
+# Remove duplicates from experiment_sets array
+unique_sets=()
+for set in "${experiment_sets[@]}"; do
+  if [[ ! " ${unique_sets[@]} " =~ " ${set} " ]]; then
+    unique_sets+=("$set")
+  fi
+done
+experiment_sets=("${unique_sets[@]}")
+
+# If 'all' is in the list, just use 'all' (it supersedes everything else)
+if [[ " ${experiment_sets[@]} " =~ " all " ]]; then
+  experiment_sets=("all")
+fi
 
 # Function to check if required tools are available
 check_required_tools() {
@@ -190,42 +218,82 @@ declare -A experiment_log_files
 # Record overall start time
 overall_start_time=$(date +%s)
 
-echo "Starting TeaStore experiments (set: $experiment_set) at $(date)"
+# Display which sets will be run
+echo "Starting TeaStore experiments with sets: ${experiment_sets[*]} at $(date)"
 echo ""
 
-# Run experiments based on selected set
-case "$experiment_set" in
-    "Training")
-        echo "Running Training experiment set"
-        run_experiment_with_timing "Training" --experiment-type training
-        ;;
-    "Noisy-Neighbor-Problem")
-        echo "Running Noisy-Neighbor-Problem experiment set"
-        run_experiment_with_timing "Baseline" --experiment-type baseline
-        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
-        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
-        ;;
-    "Noisy-Neighbor-Problem-With-Requests")
-        echo "Running Noisy-Neighbor-Problem-With-Requests experiment set"
-        run_experiment_with_timing "Baseline" --experiment-type baseline
-        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor ---n-with-res-conf
-        # run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor ---n-with-res-conf
-        ;;
-    "Applied-Guidelines")
-        echo "Running Applied-Guidelines experiment set"
-        run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
-        run_experiment_with_timing "Memory Noisy Neighbor (with resources)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
-        ;;
-    "all")
-        echo "Running all experiments"
-        run_experiment_with_timing "Training" --experiment-type training
-        run_experiment_with_timing "Baseline" --experiment-type baseline
-        run_experiment_with_timing "CPU Noisy Neighbor (without resources)" --experiment-type cpu-noisy-neighbor
-        run_experiment_with_timing "CPU Noisy Neighbor (with resources)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
-        run_experiment_with_timing "Memory Noisy Neighbor (without resources)" --experiment-type memory-noisy-neighbor
-        run_experiment_with_timing "Memory Noisy Neighbor (with resources)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
-        ;;
-esac
+# Keep track of all experiments that will be run to avoid duplicates
+declare -A experiments_to_run
+
+# Process each experiment set and collect unique experiments
+for experiment_set in "${experiment_sets[@]}"; do
+    echo "========================================"
+    echo "PROCESSING EXPERIMENT SET: $experiment_set"
+    echo "========================================"
+    
+    # Add experiments from this set to the collection
+    case "$experiment_set" in
+        "Training")
+            experiments_to_run["Training"]=1
+            ;;
+        "Noisy-Neighbor-Problem")
+            experiments_to_run["Baseline"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts without res conf)"]=1
+            experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]=1
+            ;;
+        "Noisy-Neighbor-Problem-With-Requests")
+            experiments_to_run["Baseline"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]=1
+            # experiments_to_run["Memory Noisy Neighbor (ts without res conf, nn with res conf)"]=1
+            ;;
+        "Applied-Guidelines")
+            experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
+            experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
+            ;;
+        "all")
+            experiments_to_run["Baseline"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts without res conf)"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
+            experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]=1
+            experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
+            ;;
+    esac
+done
+
+echo "========================================"
+echo "EXPERIMENTS TO RUN:"
+for experiment in "${!experiments_to_run[@]}"; do
+    echo "  - $experiment"
+done
+echo "========================================"
+echo ""
+
+# Run the unique experiments
+if [[ -n "${experiments_to_run["Training"]}" ]]; then
+    run_experiment_with_timing "Training" --experiment-type training
+fi
+if [[ -n "${experiments_to_run["Baseline"]}" ]]; then
+    run_experiment_with_timing "Baseline" --experiment-type baseline
+fi
+if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts without res conf)"]}" ]]; then
+    run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf)" --experiment-type cpu-noisy-neighbor
+fi
+if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]}" ]]; then
+    run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type cpu-noisy-neighbor --nn-with-res-conf
+fi
+if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]}" ]]; then
+    run_experiment_with_timing "CPU Noisy Neighbor (ts with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
+fi
+if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]}" ]]; then
+    run_experiment_with_timing "Memory Noisy Neighbor (ts without res conf)" --experiment-type memory-noisy-neighbor
+fi
+if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts without res conf, nn with res conf)"]}" ]]; then
+    run_experiment_with_timing "Memory Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type memory-noisy-neighbor --nn-with-res-conf
+fi
+if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]}" ]]; then
+    run_experiment_with_timing "Memory Noisy Neighbor (ts with res conf)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
+fi
 
 # Calculate overall duration
 overall_end_time=$(date +%s)
@@ -243,33 +311,9 @@ echo "Individual experiment times:"
 
 # Build experiment list based on what was actually run
 experiments_run=()
-case "$experiment_set" in
-    "Training")
-        experiments_run+=("Training")
-        ;;
-    "Noisy-Neighbor-Problem")
-        experiments_run+=("Baseline")
-        experiments_run+=("CPU Noisy Neighbor (without resources)")
-        experiments_run+=("Memory Noisy Neighbor (without resources)")
-        ;;
-    "Noisy-Neighbor-Problem-With-Requests")
-        experiments_run+=("Baseline")
-        experiments_run+=("CPU Noisy Neighbor (without resources)")
-        experiments_run+=("Memory Noisy Neighbor (without resources)")
-        ;;
-    "Applied-Guidelines")
-        experiments_run+=("CPU Noisy Neighbor (with resources)")
-        experiments_run+=("Memory Noisy Neighbor (with resources)")
-        ;;
-    "all")
-        experiments_run+=("Training")
-        experiments_run+=("Baseline")
-        experiments_run+=("CPU Noisy Neighbor (without resources)")
-        experiments_run+=("CPU Noisy Neighbor (with resources)")
-        experiments_run+=("Memory Noisy Neighbor (without resources)")
-        experiments_run+=("Memory Noisy Neighbor (with resources)")
-        ;;
-esac
+for experiment in "${!experiments_to_run[@]}"; do
+    experiments_run+=("$experiment")
+done
 
 # Display results for experiments that were actually run
 for experiment in "${experiments_run[@]}"; do
@@ -281,32 +325,15 @@ for experiment in "${experiments_run[@]}"; do
     echo "    Log file: $log_file"
 done
 
-# Show what experiments are not included in the current set
-case "$experiment_set" in
-    "Training")
-        echo "  Baseline: NOT IN SET"
-        echo "  CPU Noisy Neighbor (without resources): NOT IN SET"
-        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
-        echo "  Memory Noisy Neighbor (without resources): NOT IN SET"
-        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
-        ;;
-    "Noisy-Neighbor-Problem")
-        echo "  Training: NOT IN SET"
-        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
-        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
-        ;;
-    "Noisy-Neighbor-Problem-With-Requests")
-        echo "  Training: NOT IN SET"
-        echo "  CPU Noisy Neighbor (with resources): NOT IN SET"
-        echo "  Memory Noisy Neighbor (with resources): NOT IN SET"
-        ;;
-    "Applied-Guidelines")
-        echo "  Training: NOT IN SET"
-        echo "  Baseline: NOT IN SET"
-        echo "  CPU Noisy Neighbor (without resources): NOT IN SET"
-        echo "  Memory Noisy Neighbor (without resources): NOT IN SET"
-        ;;
-esac
+# Show what experiments are not included in the current sets
+all_possible_experiments=("Training" "Baseline" "CPU Noisy Neighbor (ts without res conf)" "CPU Noisy Neighbor (ts without res conf, nn with res conf)" "CPU Noisy Neighbor (ts with res conf)" "Memory Noisy Neighbor (ts without res conf)" "Memory Noisy Neighbor (ts without res conf, nn with res conf)" "Memory Noisy Neighbor (ts with res conf)")
+echo ""
+echo "Experiments not run:"
+for exp in "${all_possible_experiments[@]}"; do
+    if [[ -z "${experiments_to_run[$exp]}" ]]; then
+        echo "  $exp: NOT IN SELECTED SETS"
+    fi
+done
 
 echo ""
 echo "Log files created:"
