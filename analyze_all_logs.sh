@@ -1,6 +1,25 @@
 #!/bin/bash
 
 # Simple script to find and analyze all locust_*.log files in LoadTester_Logs directories
+# Usage: ./analyze_all_logs.sh [experiment_type1] [experiment_type2] ...
+# Available experiment types:
+#   - baseline
+#   - training
+#   - CPU_experiment without_resources
+#   - CPU_experiment with_resources
+#   - Memory_experiment without_resources
+#   - Memory_experiment with_resources
+# If no arguments provided, all logs will be analyzed.
+
+# Parse command line arguments for experiment type filtering
+SPECIFIED_EXPERIMENT_TYPES=()
+if [ $# -gt 0 ]; then
+    SPECIFIED_EXPERIMENT_TYPES=("$@")
+    echo "Filtering logs for specified experiment types: ${SPECIFIED_EXPERIMENT_TYPES[*]}"
+else
+    echo "No experiment types specified - analyzing all available logs"
+fi
+echo
 
 # Create output directory for analysis results
 OUTPUT_DIR="log_analysis_results"
@@ -37,33 +56,84 @@ get_sort_priority() {
         echo "1"
     elif [[ "$file_path" == *"Training"* ]]; then
         echo "2"
-    elif [[ "$file_path" == *"CPU_experiment"* ]]; then
-        if [[ "$file_path" == *"without_resources"* ]]; then
-            echo "3"
-        elif [[ "$file_path" == *"with_resources"* ]]; then
-            echo "4"
-        else
-            echo "3"  # Default CPU to without_resources priority
-        fi
-    elif [[ "$file_path" == *"Memory_experiment"* ]]; then
-        if [[ "$file_path" == *"without_resources"* ]]; then
-            echo "5"
-        elif [[ "$file_path" == *"with_resources"* ]]; then
-            echo "6"
-        else
-            echo "5"  # Default Memory to without_resources priority
-        fi
+    elif [[ "$file_path" == *"cpu-without-resources"* ]]; then
+        echo "3"
+    elif [[ "$file_path" == *"cpu-with-resources"* ]]; then
+        echo "4"
+    elif [[ "$file_path" == *"mem-without-resources"* ]]; then
+        echo "5"
+    elif [[ "$file_path" == *"mem-with-resources"* ]]; then
+        echo "6"
     else
         echo "9"  # Unknown files go last
     fi
 }
 
-# Create array of files with their priorities and sort
+# Function to get experiment type name based on file path (for filtering)
+get_experiment_type() {
+    local file_path="$1"
+    
+    if [[ "$file_path" == *"Baseline"* ]]; then
+        echo "baseline"
+    elif [[ "$file_path" == *"Training"* ]]; then
+        echo "training"
+    elif [[ "$file_path" == *"cpu-without-resources"* ]]; then
+        echo "CPU_experiment without_resources"
+    elif [[ "$file_path" == *"cpu-with-resources"* ]]; then
+        echo "CPU_experiment with_resources"
+    elif [[ "$file_path" == *"mem-without-resources"* ]]; then
+        echo "Memory_experiment without_resources"
+    elif [[ "$file_path" == *"mem-with-resources"* ]]; then
+        echo "Memory_experiment with_resources"
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to check if a log file should be included based on specified experiment types
+should_include_log() {
+    local file_path="$1"
+    
+    # If no experiment types specified, include all files
+    if [ ${#SPECIFIED_EXPERIMENT_TYPES[@]} -eq 0 ]; then
+        return 0
+    fi
+    
+    local experiment_type=$(get_experiment_type "$file_path")
+    
+    # Check if this experiment type matches any of the specified types
+    for type in "${SPECIFIED_EXPERIMENT_TYPES[@]}"; do
+        if [[ "$experiment_type" == "$type" ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Filter log files based on specified experiment types (if any) and create array with priorities
 declare -a file_priority_pairs
+filtered_count=0
 for log_file in "${log_files[@]}"; do
-    priority=$(get_sort_priority "$log_file")
-    file_priority_pairs+=("$priority:$log_file")
+    if should_include_log "$log_file"; then
+        priority=$(get_sort_priority "$log_file")
+        file_priority_pairs+=("$priority:$log_file")
+        ((filtered_count++))
+    fi
 done
+
+if [ $filtered_count -eq 0 ]; then
+    echo "No log files match the specified experiment types: ${SPECIFIED_EXPERIMENT_TYPES[*]}"
+    echo "Available experiment types found:"
+    for log_file in "${log_files[@]}"; do
+        experiment_type=$(get_experiment_type "$log_file")
+        echo "  - $experiment_type (from: $log_file)"
+    done
+    exit 1
+fi
+
+echo "After filtering: $filtered_count log file(s) selected"
+echo
 
 # Sort by priority and extract file paths
 IFS=$'\n' sorted_pairs=($(sort <<< "${file_priority_pairs[*]}"))
