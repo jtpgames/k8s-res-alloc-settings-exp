@@ -97,22 +97,62 @@ else
     ADDITIONAL_VAR_FILE_PARAM=()
 fi
 
+# Create log file with timestamp
+LOG_FILE="terraform_apply_$(date +%Y%m%d_%H%M%S).log"
+echo "Running terraform apply... Output will be logged to: $LOG_FILE"
+echo "Please wait..."
+
 # Select and execute the appropriate terraform apply command based on the argument
 case "$DEPLOYMENT_TYPE" in
     "mem-without-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
+        if terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_without_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS > "$LOG_FILE" 2>&1; then
+            echo "Terraform apply completed successfully!"
+        else
+            echo "Terraform apply failed! Check $LOG_FILE for details."
+            echo "Last 20 lines of the log:"
+            tail -n 20 "$LOG_FILE"
+            exit 1
+        fi
         ;;
     "mem-with-resources")
-        terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS
+        if terraform apply -auto-approve -var-file="experiment/memory_allocator_teastore_with_resource.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.memory-allocator[0]" $REPLACEMENTS > "$LOG_FILE" 2>&1; then
+            echo "Terraform apply completed successfully!"
+        else
+            echo "Terraform apply failed! Check $LOG_FILE for details."
+            echo "Last 20 lines of the log:"
+            tail -n 20 "$LOG_FILE"
+            exit 1
+        fi
         ;;
     "cpu-without-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
+        if terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_without_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS > "$LOG_FILE" 2>&1; then
+            echo "Terraform apply completed successfully!"
+        else
+            echo "Terraform apply failed! Check $LOG_FILE for details."
+            echo "Last 20 lines of the log:"
+            tail -n 20 "$LOG_FILE"
+            exit 1
+        fi
         ;;
     "cpu-with-resources")
-        terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS
+        if terraform apply -auto-approve -var-file="experiment/cpu_load_generator_teastore_with_resources.tfvars" "${ADDITIONAL_VAR_FILE_PARAM[@]}" -replace="module.noisy-neighbor.kubernetes_deployment_v1.cpu-load-generator[0]" $REPLACEMENTS > "$LOG_FILE" 2>&1; then
+            echo "Terraform apply completed successfully!"
+        else
+            echo "Terraform apply failed! Check $LOG_FILE for details."
+            echo "Last 20 lines of the log:"
+            tail -n 20 "$LOG_FILE"
+            exit 1
+        fi
         ;;
     "default")
-        terraform apply -auto-approve "${ADDITIONAL_VAR_FILE_PARAM[@]}" $REPLACEMENTS
+        if terraform apply -auto-approve "${ADDITIONAL_VAR_FILE_PARAM[@]}" $REPLACEMENTS > "$LOG_FILE" 2>&1; then
+            echo "Terraform apply completed successfully!"
+        else
+            echo "Terraform apply failed! Check $LOG_FILE for details."
+            echo "Last 20 lines of the log:"
+            tail -n 20 "$LOG_FILE"
+            exit 1
+        fi
         ;;
 esac
 
