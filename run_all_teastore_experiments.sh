@@ -1,15 +1,19 @@
 #!/bin/bash
 
-# Simple signal handler for Ctrl+C - terminate immediately
 handle_interrupt() {
     echo ""
     echo "Experiment cancelled by user (Ctrl+C)"
     echo "Terminating..."
+
+    # Kill all child processes of this script too
+    trap - SIGINT SIGTERM
+    kill -- -$$ 2>/dev/null || true
+
     exit 130
 }
 
 # Set up signal trap
-trap handle_interrupt SIGINT
+trap handle_interrupt SIGINT SIGTERM
 
 # Parse command line arguments
 experiment_sets=("all")  # Default to running all experiments
@@ -33,6 +37,7 @@ while [[ $# -gt 0 ]]; do
       echo "                                Noisy-Neighbor-Problem - Run Baseline, CPU and Memory Noisy Neighbor (ts without res conf)"
       echo "                                Noisy-Neighbor-Problem-With-Requests - Same as above but with --n-with-res-conf for noisy neighbors"
       echo "                                Applied-Guidelines - Run CPU and Memory Noisy Neighbor (ts with res conf)"
+      echo "                                Custom-WebUI-Resources - Run Baseline experiments with custom TeaStore WebUI resource configurations"
       echo "                                all (default) - Run all experiments except Training"
       echo "  -h, --help                  Show this help message"
       echo ""
@@ -50,7 +55,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate experiment sets
-valid_sets=("Training" "Noisy-Neighbor-Problem" "Noisy-Neighbor-Problem-With-Requests" "Applied-Guidelines" "all")
+valid_sets=("Training" "Noisy-Neighbor-Problem" "Noisy-Neighbor-Problem-With-Requests" "Applied-Guidelines" "Custom-WebUI-Resources" "all")
 for experiment_set in "${experiment_sets[@]}"; do
   is_valid=false
   for valid_set in "${valid_sets[@]}"; do
@@ -62,7 +67,7 @@ for experiment_set in "${experiment_sets[@]}"; do
   
   if [[ "$is_valid" == "false" ]]; then
     echo "Error: Invalid experiment set '$experiment_set'"
-    echo "Valid options: Training, Noisy-Neighbor-Problem, Noisy-Neighbor-Problem-With-Requests, Applied-Guidelines, all"
+    echo "Valid options: Training, Noisy-Neighbor-Problem, Noisy-Neighbor-Problem-With-Requests, Applied-Guidelines, Custom-WebUI-Resources, all"
     exit 1
   fi
 done
@@ -172,6 +177,7 @@ run_experiment_with_timing() {
     
     # Run the experiment and capture all output to log file
     # Use 'tee' to also display output to console while logging
+    echo "./run_teastore_experiment.sh \"$@\" 2>&1 | tee -a \"$timestamped_log_file\""
     ./run_teastore_experiment.sh "$@" 2>&1 | tee -a "$timestamped_log_file"
     local exit_code=${PIPESTATUS[0]}  # Get exit code from the actual command, not tee
     
@@ -222,6 +228,33 @@ overall_start_time=$(date +%s)
 echo "Starting TeaStore experiments with sets: ${experiment_sets[*]} at $(date)"
 echo ""
 
+# Function to discover ts_webui_*.tfvars files and add corresponding experiments
+add_custom_webui_experiments() {
+    local tfvars_dir="terraform_teastore/experiment"
+    
+    if [ ! -d "$tfvars_dir" ]; then
+        echo "Warning: Directory $tfvars_dir not found. Skipping Custom-WebUI-Resources experiments."
+        return
+    fi
+    
+    # Find all ts_webui_*.tfvars files
+    local tfvars_files
+    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_webui_*.tfvars" -type f -exec basename {} \; | sort)
+    
+    if [ ${#tfvars_files[@]} -eq 0 ]; then
+        echo "Warning: No ts_webui_*.tfvars files found in $tfvars_dir. Skipping Custom-WebUI-Resources experiments."
+        return
+    fi
+    
+    echo "Found ${#tfvars_files[@]} ts_webui_*.tfvars files:"
+    for tfvars_file in "${tfvars_files[@]}"; do
+        echo "  - $tfvars_file"
+        # Remove the .tfvars extension for the experiment name
+        local experiment_name="${tfvars_file%.tfvars}"
+        experiments_to_run["Baseline (custom $experiment_name)"]=1
+    done
+}
+
 # Keep track of all experiments that will be run to avoid duplicates
 declare -A experiments_to_run
 
@@ -244,11 +277,13 @@ for experiment_set in "${experiment_sets[@]}"; do
         "Noisy-Neighbor-Problem-With-Requests")
             experiments_to_run["Baseline"]=1
             experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]=1
-            # experiments_to_run["Memory Noisy Neighbor (ts without res conf, nn with res conf)"]=1
             ;;
         "Applied-Guidelines")
             experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
+            ;;
+        "Custom-WebUI-Resources")
+            add_custom_webui_experiments
             ;;
         "all")
             experiments_to_run["Baseline"]=1
@@ -257,6 +292,7 @@ for experiment_set in "${experiment_sets[@]}"; do
             experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
+            add_custom_webui_experiments
             ;;
     esac
 done
@@ -288,12 +324,21 @@ fi
 if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]}" ]]; then
     run_experiment_with_timing "Memory Noisy Neighbor (ts without res conf)" --experiment-type memory-noisy-neighbor
 fi
-if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts without res conf, nn with res conf)"]}" ]]; then
-    run_experiment_with_timing "Memory Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type memory-noisy-neighbor --nn-with-res-conf
-fi
 if [[ -n "${experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]}" ]]; then
     run_experiment_with_timing "Memory Noisy Neighbor (ts with res conf)" --experiment-type memory-noisy-neighbor --ts-with-res-conf
 fi
+
+# Run all Custom-WebUI-Resources experiments dynamically
+for experiment in "${!experiments_to_run[@]}"; do
+    if [[ "$experiment" == "Baseline (custom "* ]]; then
+        # Extract the tfvars filename from the experiment name
+        # Format: "Baseline (custom ts_webui_with_request_limit)" -> "ts_webui_with_request_limit"
+        tfvars_name=${experiment#"Baseline (custom "}
+        tfvars_name=${tfvars_name%")"}
+        
+        run_experiment_with_timing "$experiment" --experiment-type baseline --ts-with-custom-res-conf "$tfvars_name"
+    fi
+done
 
 # Calculate overall duration
 overall_end_time=$(date +%s)
@@ -325,8 +370,20 @@ for experiment in "${experiments_run[@]}"; do
     echo "    Log file: $log_file"
 done
 
+# Build list of all possible experiments (including dynamically discovered ones)
+all_possible_experiments=("Training" "Baseline" "CPU Noisy Neighbor (ts without res conf)" "CPU Noisy Neighbor (ts without res conf, nn with res conf)" "CPU Noisy Neighbor (ts with res conf)" "Memory Noisy Neighbor (ts without res conf)" "Memory Noisy Neighbor (ts with res conf)")
+
+# Add dynamically discovered Custom-WebUI-Resources experiments to the list
+tfvars_dir="terraform_teastore/experiment"
+if [ -d "$tfvars_dir" ]; then
+    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_webui_*.tfvars" -type f -exec basename {} \; | sort)
+    for tfvars_file in "${tfvars_files[@]}"; do
+        experiment_name="${tfvars_file%.tfvars}"
+        all_possible_experiments+=("Baseline (custom $experiment_name)")
+    done
+fi
+
 # Show what experiments are not included in the current sets
-all_possible_experiments=("Training" "Baseline" "CPU Noisy Neighbor (ts without res conf)" "CPU Noisy Neighbor (ts without res conf, nn with res conf)" "CPU Noisy Neighbor (ts with res conf)" "Memory Noisy Neighbor (ts without res conf)" "Memory Noisy Neighbor (ts without res conf, nn with res conf)" "Memory Noisy Neighbor (ts with res conf)")
 echo ""
 echo "Experiments not run:"
 for exp in "${all_possible_experiments[@]}"; do

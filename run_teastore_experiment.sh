@@ -41,6 +41,8 @@ function create_and_activate_venv_in_current_dir {
 skip_warmup=false
 experiment_type="training"  # default to training
 teastore_with_resource_configurations=false
+teastore_with_additional_custom_resource_configurations=false
+custom_tfvars_file=""
 noisy_neighbor_with_resource_configurations=false
 skip_cluster_destruction=true
 
@@ -53,6 +55,18 @@ while [[ $# -gt 0 ]]; do
     --ts-with-res-conf)
       teastore_with_resource_configurations=true
       shift # past argument
+      ;;
+    --ts-with-custom-res-conf)
+      teastore_with_additional_custom_resource_configurations=true
+      shift # past argument
+      # Check if next argument exists and is not another flag
+      if [[ $# -gt 0 && "$1" != --* ]]; then
+        custom_tfvars_file="$1"
+        shift # past value
+      else
+        echo "Error: --ts-with-custom-res-conf requires a .tfvars filename as the next argument"
+        exit 1
+      fi
       ;;
     --nn-with-res-conf)
       noisy_neighbor_with_resource_configurations=true
@@ -76,6 +90,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --skip-warmup               Skip the warmup phase"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
+      echo "  --ts-with-custom-res-conf FILE  Start TeaStore with custom resource configurations from FILE.tfvars in terraform_teastore/experiment/"
       echo "  --nn-with-res-conf          Start noisy neighbor with resource allocation configurations"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
       echo "  --destroy-cluster           Destroy the Kubernetes cluster at the end"
@@ -130,6 +145,16 @@ echo "$deployment_type" > "current_deployment_type.txt"
 # Construct deploy command with additional var file if needed
 if [ "$experiment_type" = "cpu-noisy-neighbor" ] && [ "$noisy_neighbor_with_resource_configurations" = true ]; then
   ./deploy.sh --additional-var-file "experiment/cpu_load_generator_resources.tfvars" "$deployment_type"
+elif [ "$teastore_with_additional_custom_resource_configurations" = true ]; then
+  # Check if the custom tfvars file exists
+  if [ -f "experiment/${custom_tfvars_file}.tfvars" ]; then
+    ./deploy.sh --additional-var-file "experiment/${custom_tfvars_file}.tfvars" "$deployment_type"
+  else
+    echo "Error: Custom tfvars file 'experiment/${custom_tfvars_file}.tfvars' not found"
+    echo "Available files in terraform_teastore/experiment/:"
+    ls -la experiment/*.tfvars 2>/dev/null || echo "No .tfvars files found"
+    exit 1
+  fi
 else
   ./deploy.sh "$deployment_type"
 fi
@@ -140,7 +165,7 @@ cd ..
 # Executing TeaStore Load Tests for training data
 
 # PROFILES_FULL="low low_2 med high"
-PROFILES_FULL="med"
+PROFILES_FULL="low_4"
 PROFILES_TRAINING="med med med"
 
 # Set profiles based on experiment type
