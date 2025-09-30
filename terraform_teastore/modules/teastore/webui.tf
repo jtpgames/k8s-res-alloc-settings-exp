@@ -58,8 +58,12 @@ resource "kubernetes_deployment_v1" "webui" {
           dynamic "resources" {
             for_each = var.webui_resources.requests != null || var.webui_resources.limits != null ? [1] : []
             content {
-              limits   = var.webui_resources.limits
-              requests = var.webui_resources.requests
+              limits = var.webui_resources.limits != null ? {
+                for k, v in var.webui_resources.limits : k => v if v != null
+              } : null
+              requests = var.webui_resources.requests != null ? {
+                for k, v in var.webui_resources.requests : k => v if v != null
+              } : null
             }
           }
         }

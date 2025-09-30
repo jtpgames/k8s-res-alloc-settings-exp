@@ -100,12 +100,13 @@ variable "recommender_resources" {
 
 variable "webui_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
