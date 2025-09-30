@@ -4,10 +4,8 @@
 webui_resources = {
   requests = {
     cpu = "50m"
-    memory = "2000Mi"
   }
   limits = {
-    cpu = "100m"
-    memory = "2000Mi"
+    cpu = "500m"
   }
 }
