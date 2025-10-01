@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --experiment-set SET        Run specific experiment set (can be used multiple times)"
       echo "                                Training - Only run Training experiment"
       echo "                                Noisy-Neighbor-Problem - Run Baseline, CPU and Memory Noisy Neighbor (ts without res conf)"
-      echo "                                Noisy-Neighbor-Problem-With-Requests - Same as above but with --n-with-res-conf for noisy neighbors"
+      echo "                                Noisy-Neighbor-Problem-With-Requests - Same as above but with custom resource configurations for noisy neighbors"
       echo "                                Applied-Guidelines - Run CPU and Memory Noisy Neighbor (ts with res conf)"
       echo "                                Custom-WebUI-Resources - Run Baseline experiments with custom TeaStore WebUI resource configurations"
       echo "                                all (default) - Run all experiments except Training"
@@ -316,7 +316,7 @@ if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts without res conf)"]}" ]];
     run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf)" --experiment-type cpu-noisy-neighbor
 fi
 if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]}" ]]; then
-    run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type cpu-noisy-neighbor --nn-with-res-conf
+    run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-custom-res-conf cpu_load_generator_resources
 fi
 if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]}" ]]; then
     run_experiment_with_timing "CPU Noisy Neighbor (ts with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf

@@ -43,7 +43,6 @@ experiment_type="training"  # default to training
 teastore_with_resource_configurations=false
 teastore_with_additional_custom_resource_configurations=false
 custom_tfvars_file=""
-noisy_neighbor_with_resource_configurations=false
 skip_cluster_destruction=true
 
 while [[ $# -gt 0 ]]; do
@@ -68,10 +67,6 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       ;;
-    --nn-with-res-conf)
-      noisy_neighbor_with_resource_configurations=true
-      shift # past argument
-      ;;
     --destroy-cluster)
       skip_cluster_destruction=false
       shift # past argument
@@ -91,7 +86,6 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-warmup               Skip the warmup phase"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
       echo "  --ts-with-custom-res-conf FILE  Start TeaStore with custom resource configurations from FILE.tfvars in terraform_teastore/experiment/"
-      echo "  --nn-with-res-conf          Start noisy neighbor with resource allocation configurations"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
       echo "  --destroy-cluster           Destroy the Kubernetes cluster at the end"
       echo "  -h, --help                  Show this help message"
@@ -143,9 +137,7 @@ echo "Using deployment type: $deployment_type"
 echo "$deployment_type" > "current_deployment_type.txt"
 
 # Construct deploy command with additional var file if needed
-if [ "$experiment_type" = "cpu-noisy-neighbor" ] && [ "$noisy_neighbor_with_resource_configurations" = true ]; then
-  ./deploy.sh --additional-var-file "experiment/cpu_load_generator_resources.tfvars" "$deployment_type"
-elif [ "$teastore_with_additional_custom_resource_configurations" = true ]; then
+if [ "$teastore_with_additional_custom_resource_configurations" = true ]; then
   # Check if the custom tfvars file exists
   if [ -f "experiment/${custom_tfvars_file}.tfvars" ]; then
     ./deploy.sh --additional-var-file "experiment/${custom_tfvars_file}.tfvars" "$deployment_type"
@@ -354,6 +346,7 @@ if [ "$experiment_type" = "memory-noisy-neighbor" ]; then
   ./run_memory_experiment.sh --skip-modules-modification --once > "$memory_log_file" 2>&1 &
   memory_experiment_pid=$!
   echo "Memory experiment started with PID $memory_experiment_pid, logging to $memory_log_file"
+# Start CPU experiment if experiment type is cpu-noisy-neighbor
 elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
   target_directory="$cpu_noisy_neighbor_experiment_dir/LoadTester_Logs_${START_TIME}"
   mkdir -pv "$target_directory"
@@ -363,9 +356,11 @@ elif [ "$experiment_type" = "cpu-noisy-neighbor" ]; then
   ./run_cpu_experiment.sh > "$cpu_log_file" 2>&1 &
   cpu_experiment_pid=$!
   echo "CPU experiment started with PID $cpu_experiment_pid, logging to $cpu_log_file"
+# Start Baseline experiment if experiment type is baseline
 elif [ "$experiment_type" = "baseline" ]; then
   target_directory="$baseline_experiment_directory/LoadTester_Logs_${START_TIME}"
   mkdir -pv "$target_directory"
+# Otherwise, start Training experiment
 else
   target_directory="$training_experiment_directory/LoadTester_Logs_${START_TIME}"
   mkdir -pv "$target_directory"
