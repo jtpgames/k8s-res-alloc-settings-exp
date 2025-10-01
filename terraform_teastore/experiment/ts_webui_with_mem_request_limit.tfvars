@@ -5,6 +5,6 @@ webui_resources = {
     memory = "100Mi"
   }
   limits = {
-    memory = "900Mi"
+    memory = "800Mi"
   }
 }
