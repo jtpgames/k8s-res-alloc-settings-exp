@@ -373,12 +373,15 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                           color=color_to_use, alpha=alpha_val, hatch=hatch, 
                           edgecolor='black', linewidth=edge_width)
            
-            # Add value labels on bars
+            # Add value labels on bars (omit response time labels in publication mode for cleaner appearance)
             for j, (bar, response_time, count) in enumerate(zip(bars, file_response_times, file_request_counts)):
                 if response_time > 0:  # Only label non-zero bars
                     height = bar.get_height()
-                    ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                            f'{response_time:.0f}ms', ha='center', va='bottom', fontsize=8, fontweight='bold')
+                    
+                    # Only show response time labels if not in publication mode
+                    if not publication_ready:
+                        ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
+                                f'{response_time:.0f}ms', ha='center', va='bottom', fontsize=8, fontweight='bold')
                    
                     if not omit_request_count_per_bar_labels:
                         # Add request count in the middle of the bar
@@ -459,9 +462,9 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                               color=error_colors[:len(all_error_types)], alpha=0.8, 
                               hatch=hatch, edgecolor='black', linewidth=edge_width)
                 
-                # Add value labels on bars (only for non-zero values)
+                # Add value labels on bars (only for non-zero values, omit in publication mode)
                 for j, (bar, count) in enumerate(zip(bars, file_error_counts)):
-                    if count > 0:  # Only label non-zero bars
+                    if count > 0 and not publication_ready:  # Only label non-zero bars and not in publication mode
                         height = bar.get_height()
                         ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                                 f'{count}', ha='center', va='bottom', fontsize=8, fontweight='bold')
