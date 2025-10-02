@@ -228,33 +228,6 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats]
     
     return dict(response_times), error_stats
 
-def calculate_statistics(response_times: Dict[str, List[float]]) -> pd.DataFrame:
-    """Calculate average and median response times for each request type (single file)."""
-    stats = []
-    
-    for request_type, times in response_times.items():
-        if times:  # Only process if there are response times
-            sorted_times = sorted(times)
-            n = len(sorted_times)
-            
-            # Calculate median
-            if n % 2 == 0:
-                median_time = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
-            else:
-                median_time = sorted_times[n//2]
-            
-            stats.append({
-                'Request Type': request_type,
-                'Average Response Time (ms)': sum(times) / len(times),
-                'Median Response Time (ms)': median_time,
-                'Min Response Time (ms)': min(times),
-                'Max Response Time (ms)': max(times),
-                'Count': len(times)
-            })
-    
-    if not stats:
-        return pd.DataFrame(columns=['Request Type', 'Average Response Time (ms)', 'Median Response Time (ms)', 'Min Response Time (ms)', 'Max Response Time (ms)', 'Count'])
-    return pd.DataFrame(stats).sort_values('Average Response Time (ms)', ascending=False)
 
 def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFrame:
     """Calculate statistics for multiple files, keeping file information."""
@@ -284,98 +257,6 @@ def calculate_multi_file_statistics(file_data_list: List[FileData]) -> pd.DataFr
     
     return pd.DataFrame(all_stats).sort_values(['Request Type', 'File'])
 
-def create_bar_chart(stats_df: pd.DataFrame, error_stats: ErrorStats, output_dir: Path, log_file: Path, metric_type: str = "average"):
-    """Create and save bar charts for response times and error count (single file)."""
-    
-    # Create figure with subplots - optimized size for compact layout
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
-    
-    # Plot 1: Response Times by Request Type
-    if not stats_df.empty:
-        # Calculate total request count for title
-        total_requests = stats_df['Count'].sum()
-        
-        # Select the appropriate metric column
-        metric_column = f'{metric_type.title()} Response Time (ms)'
-        
-        # Create the primary bars for response times
-        bars1 = ax1.bar(range(len(stats_df)), stats_df[metric_column], 
-                       color='skyblue', alpha=0.7)
-        ax1.set_xlabel('Request Type')
-        ax1.set_ylabel(f'{metric_type.title()} Response Time (ms)', color='#2980b9')
-        ax1.set_title(f'{metric_type.title()} Response Times per Request Type (Total Requests: {total_requests:,})')
-        ax1.set_xticks(range(len(stats_df)))
-        ax1.set_xticklabels(stats_df['Request Type'], rotation=45, ha='right')
-        ax1.grid(axis='y', alpha=0.3)
-        
-        # Add value labels on bars for response time
-        for i, bar in enumerate(bars1):
-            height = bar.get_height()
-            ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                    f'{height:.1f}ms', ha='center', va='bottom', fontsize=8, color='#2980b9')
-            
-            # Add request count below the bar labels
-            count = stats_df.iloc[i]['Count']
-            ax1.text(bar.get_x() + bar.get_width()/2., height/2,
-                    f'{count:,}\nreqs', ha='center', va='center', 
-                    fontsize=8, color='black', fontweight='bold', 
-                    bbox=dict(facecolor='white', alpha=0.7, pad=1, boxstyle='round,pad=0.2'))
-    else:
-        ax1.text(0.5, 0.5, 'No response time data found', 
-                ha='center', va='center', transform=ax1.transAxes)
-        ax1.set_title(f'{metric_type.title()} Response Times per Request Type')
-    
-    # Plot 2: Error Breakdown by Type
-    error_dict = error_stats.to_dict()
-    # Filter out error types with zero count for cleaner visualization
-    filtered_errors = {k: v for k, v in error_dict.items() if v > 0}
-    
-    if filtered_errors:
-        categories = list(filtered_errors.keys())
-        counts = list(filtered_errors.values())
-        
-        # Create a color map with distinct colors
-        if len(categories) <= 8:
-            colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe']
-        else:
-            # Use colormap for many categories
-            colors = plt.colormaps['Set3'](np.linspace(0, 1, len(categories)))
-        
-        bars2 = ax2.bar(categories, counts, color=colors[:len(categories)], alpha=0.8)
-        ax2.set_ylabel('Error Count')
-        ax2.set_title(f'Error Breakdown by Type (Total: {error_stats.total_errors})')
-        ax2.set_xticks(range(len(categories)))
-        ax2.set_xticklabels(categories, rotation=45, ha='right')
-        ax2.grid(axis='y', alpha=0.3)
-        
-        # Add value labels on bars
-        for bar, count in zip(bars2, counts):
-            ax2.text(bar.get_x() + bar.get_width()/2., count + count*0.01,
-                    f'{count}', ha='center', va='bottom', fontsize=10, fontweight='bold')
-    else:
-        ax2.text(0.5, 0.5, 'No errors found', 
-                ha='center', va='center', transform=ax2.transAxes, fontsize=14)
-        ax2.set_title('Error Breakdown by Type')
-        ax2.set_ylabel('Error Count')
-    
-    # Optimize spacing between subplots for compact layout
-    plt.subplots_adjust(hspace=0.4)  # Reduce vertical spacing between subplots
-    plt.tight_layout(pad=1.0)  # Reduce overall padding
-    
-    # Save the plot as a vector PDF with experiment type prefix
-    # Get experiment type from the second parent directory of the log file path
-    try:
-        # Attempt to get the experiment type from the second parent directory
-        experiment_type = log_file.parent.parent.name
-        output_filename = f'{experiment_type}_locust_analysis_results.pdf'
-    except (AttributeError, IndexError):
-        # Fallback if we can't determine the experiment type
-        output_filename = 'locust_analysis_results.pdf'
-        typer.echo("Warning: Could not determine experiment type from log file path")
-    
-    output_file = output_dir / output_filename
-    plt.savefig(output_file, format='pdf', bbox_inches='tight')
-    typer.echo(f"Chart saved to: {output_file}")
 
 def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path, 
                                 omit_request_count_per_bar_labels: bool = False,
@@ -658,92 +539,40 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
     # Show the plot
     # plt.show()
 
-def print_summary(stats_df: pd.DataFrame, error_stats: ErrorStats, metric_type: str = "average"):
-    """Print a summary of the analysis results (single file)."""
-    """Print a summary of the analysis results."""
-    typer.echo("\n" + "="*60)
-    typer.echo("LOCUST LOG ANALYSIS SUMMARY")
-    typer.echo("="*60)
+
+def _calculate_file_statistics(response_times: Dict[str, List[float]]) -> pd.DataFrame:
+    """Calculate average and median response times for each request type (helper function)."""
+    stats = []
     
-    if not stats_df.empty:
-        total_requests = stats_df['Count'].sum()
-        typer.echo(f"\nFound {len(stats_df)} different request types:")
-        typer.echo(f"Total Requests Processed: {total_requests:,}")
-        typer.echo(f"\nResponse Time Statistics (📈 {metric_type.title()} metric highlighted for plotting):")
-        typer.echo(stats_df.to_string(index=False, float_format='%.2f'))
-        
-        # Sort by the selected metric for the "slowest" display
-        metric_column = f'{metric_type.title()} Response Time (ms)'
-        sorted_stats = stats_df.sort_values(metric_column, ascending=False)
-        
-        typer.echo(f"\nTop 3 slowest request types (by {metric_type}):")
-        for i, row in sorted_stats.head(3).iterrows():
-            avg_time = row['Average Response Time (ms)']
-            med_time = row['Median Response Time (ms)']
-            selected_time = row[metric_column]
-            typer.echo(f"  {i+1}. {row['Request Type']}: {selected_time:.2f}ms [{metric_type}] "
-                      f"(avg: {avg_time:.2f}ms, median: {med_time:.2f}ms, count: {row['Count']})")
-    else:
-        typer.echo("\nNo response time data found in the log file.")
+    for request_type, times in response_times.items():
+        if times:  # Only process if there are response times
+            sorted_times = sorted(times)
+            n = len(sorted_times)
+            
+            # Calculate median
+            if n % 2 == 0:
+                median_time = (sorted_times[n//2 - 1] + sorted_times[n//2]) / 2
+            else:
+                median_time = sorted_times[n//2]
+            
+            stats.append({
+                'Request Type': request_type,
+                'Average Response Time (ms)': sum(times) / len(times),
+                'Median Response Time (ms)': median_time,
+                'Min Response Time (ms)': min(times),
+                'Max Response Time (ms)': max(times),
+                'Count': len(times)
+            })
     
-    # Print detailed error statistics with success rate
-    typer.echo(f"\nRequest Completion Statistics:")
-    if not stats_df.empty:
-        total_requests = stats_df['Count'].sum()
-        success_rate = ((total_requests - error_stats.total_errors) / total_requests * 100) if total_requests > 0 else 0
-        typer.echo(f"  Total Requests: {total_requests:,}")
-        typer.echo(f"  Successful Requests: {total_requests - error_stats.total_errors:,} ({success_rate:.1f}%)")
-    typer.echo(f"  Total Errors: {error_stats.total_errors}")
-    
-    if error_stats.total_errors > 0:
-        # Show HTTP errors summary
-        if error_stats.total_http_errors > 0:
-            typer.echo(f"\n  HTTP Status Code Errors: {error_stats.total_http_errors} ({(error_stats.total_http_errors / error_stats.total_errors * 100):.1f}%)")
-            if error_stats.http_503_errors > 0:
-                typer.echo(f"    - HTTP 503 (Service Unavailable): {error_stats.http_503_errors}")
-            if error_stats.http_502_errors > 0:
-                typer.echo(f"    - HTTP 502 (Bad Gateway): {error_stats.http_502_errors}")
-            if error_stats.http_500_errors > 0:
-                typer.echo(f"    - HTTP 500 (Internal Server Error): {error_stats.http_500_errors}")
-        
-        # Show functional errors summary
-        if error_stats.total_functional_errors > 0:
-            typer.echo(f"\n  Functional Errors: {error_stats.total_functional_errors} ({(error_stats.total_functional_errors / error_stats.total_errors * 100):.1f}%)")
-            if error_stats.profile_errors > 0:
-                typer.echo(f"    - Profile Access Errors: {error_stats.profile_errors}")
-            if error_stats.logout_errors > 0:
-                typer.echo(f"    - Logout Errors: {error_stats.logout_errors}")
-            if error_stats.login_errors > 0:
-                typer.echo(f"    - Login Errors: {error_stats.login_errors}")
-            if error_stats.category_errors > 0:
-                typer.echo(f"    - Category Browse Errors: {error_stats.category_errors}")
-            if error_stats.product_errors > 0:
-                typer.echo(f"    - Product/Cart Errors: {error_stats.product_errors}")
-            if error_stats.page_load_errors > 0:
-                typer.echo(f"    - Page Load Errors: {error_stats.page_load_errors}")
-        
-        # Show other error types if any
-        other_total = (error_stats.timeout_errors + error_stats.unknown_errors + 
-                      error_stats.connection_errors + error_stats.other_errors)
-        if other_total > 0:
-            typer.echo(f"\n  Other Errors: {other_total} ({(other_total / error_stats.total_errors * 100):.1f}%)")
-            if error_stats.timeout_errors > 0:
-                typer.echo(f"    - Timeout Errors: {error_stats.timeout_errors}")
-            if error_stats.unknown_errors > 0:
-                typer.echo(f"    - Unknown/Empty Errors: {error_stats.unknown_errors}")
-            if error_stats.connection_errors > 0:
-                typer.echo(f"    - Connection Errors: {error_stats.connection_errors}")
-            if error_stats.other_errors > 0:
-                typer.echo(f"    - Other Errors: {error_stats.other_errors}")
-        
-        typer.echo("\n⚠️  There were errors during the load test. Check the error messages above.")
-    else:
-        typer.echo("\n✅ No errors found in the log file.")
+    if not stats:
+        return pd.DataFrame(columns=['Request Type', 'Average Response Time (ms)', 'Median Response Time (ms)', 'Min Response Time (ms)', 'Max Response Time (ms)', 'Count'])
+    return pd.DataFrame(stats).sort_values('Average Response Time (ms)', ascending=False)
 
 def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = "average"):
-    """Print a summary of the analysis results for multiple files."""
+    """Print a summary of the analysis results."""
+    # Consistent header for all cases
     typer.echo("\n" + "="*80)
-    typer.echo("MULTI-FILE LOCUST LOG ANALYSIS SUMMARY")
+    typer.echo("LOCUST LOG ANALYSIS SUMMARY")
     typer.echo(f"📈 Using {metric_type.title()} Response Times for Charts")
     typer.echo("="*80)
     
@@ -753,17 +582,18 @@ def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = 
         typer.echo("-" * 60)
         
         # Calculate stats for this file
-        stats_df = calculate_statistics(file_data.response_times)
+        stats_df = _calculate_file_statistics(file_data.response_times)
         
         if not stats_df.empty:
             total_requests = stats_df['Count'].sum()
+            # Consistent condensed information for all cases
             typer.echo(f"Request Types: {len(stats_df)}")
             typer.echo(f"Total Requests: {total_requests:,}")
             
             # Show top 3 slowest for this file by the selected metric
             metric_column = f'{metric_type.title()} Response Time (ms)'
             sorted_stats = stats_df.sort_values(metric_column, ascending=False)
-            typer.echo(f"Top 3 slowest request types (by {metric_type}):")
+            typer.echo(f"\nTop 3 slowest request types (by {metric_type}):")
             for j, row in sorted_stats.head(3).iterrows():
                 avg_time = row['Average Response Time (ms)']
                 med_time = row['Median Response Time (ms)']
@@ -776,19 +606,20 @@ def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = 
         
         # Error statistics for this file
         error_stats = file_data.error_stats
+        
         if total_requests > 0:
-            success_rate = ((total_requests - error_stats.total_errors) / total_requests * 100) if total_requests > 0 else 0
+            success_rate = ((total_requests - error_stats.total_errors) / total_requests * 100)
             typer.echo(f"Successful Requests: {total_requests - error_stats.total_errors:,} ({success_rate:.1f}%)")
         typer.echo(f"Total Errors: {error_stats.total_errors}")
         
+        # Show consistent error summary for all cases
         if error_stats.total_errors > 0:
-            # Show main error categories for this file
             if error_stats.total_http_errors > 0:
                 typer.echo(f"  HTTP Errors: {error_stats.total_http_errors}")
             if error_stats.total_functional_errors > 0:
                 typer.echo(f"  Functional Errors: {error_stats.total_functional_errors}")
     
-    # Combined statistics
+    # Always show combined statistics section
     typer.echo("\n" + "="*60)
     typer.echo("COMBINED STATISTICS")
     typer.echo("="*60)
@@ -799,7 +630,7 @@ def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = 
     combined_request_types = set()
     
     for file_data in file_data_list:
-        stats_df = calculate_statistics(file_data.response_times)
+        stats_df = _calculate_file_statistics(file_data.response_times)
         if not stats_df.empty:
             total_requests_all += stats_df['Count'].sum()
         total_errors_all += file_data.error_stats.total_errors
@@ -815,10 +646,11 @@ def print_multi_file_summary(file_data_list: List[FileData], metric_type: str = 
     
     typer.echo(f"Total Errors (All Files): {total_errors_all}")
     
+    # Consistent final status message
     if total_errors_all == 0:
-        typer.echo("\n✅ No errors found across all log files.")
+        typer.echo("\n✅ No errors found across all analyzed files.")
     else:
-        typer.echo("\n⚠️  There were errors in the analyzed log files.")
+        typer.echo("\n⚠️  There were errors in the analyzed files.")
 
 @app.command()
 def analyze(
@@ -864,65 +696,38 @@ def analyze(
     else:
         output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Handle single vs multiple files
-    if len(log_files) == 1:
-        # Single file - use original logic
-        log_file = log_files[0]
-        typer.echo(f"Analyzing single log file: {log_file}")
-        typer.echo(f"Output directory: {output_dir}")
-        
-        # Parse the log file
-        typer.echo("Parsing log file...")
-        response_times, error_stats = parse_log_file(log_file)
-        
-        if not response_times:
-            typer.echo("No response time data found in the log file.")
-            if error_stats.total_errors == 0:
-                typer.echo("No errors found either. Please check the log file format.")
-                raise typer.Exit(1)
-        
-        # Calculate statistics
-        typer.echo("Calculating statistics...")
-        stats_df = calculate_statistics(response_times)
-        
-        # Create and save charts
-        typer.echo("Creating charts...")
-        create_bar_chart(stats_df, error_stats, output_dir, log_file, metric_type_lower)
-        
-        # Print summary
-        print_summary(stats_df, error_stats, metric_type_lower)
-        
-    else:
-        # Multiple files - use new logic
-        typer.echo(f"Analyzing {len(log_files)} log files:")
-        for log_file in log_files:
-            typer.echo(f"  - {log_file}")
-        typer.echo(f"Output directory: {output_dir}")
-        
-        # Parse all log files
-        typer.echo("\nParsing log files...")
-        file_data_list = parse_multiple_log_files(log_files)
-        
-        # Check if any files have data
-        has_data = False
-        for file_data in file_data_list:
-            if file_data.response_times or file_data.error_stats.total_errors > 0:
-                has_data = True
-                break
-        
-        if not has_data:
-            typer.echo("No response time data or errors found in any log file.")
-            typer.echo("Please check the log file formats.")
-            raise typer.Exit(1)
-        
-        # Create and save charts
-        typer.echo("\nCreating multi-file comparison charts...")
-        create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, 
-                                   simple_title=True, publication_ready=publication_ready, 
-                                   export_svg=export_svg, metric_type=metric_type_lower)
-        
-        # Print summary
-        print_multi_file_summary(file_data_list, metric_type_lower)
+    # Consistent message format for all cases
+    typer.echo(f"Analyzing {len(log_files)} log file(s):")
+    for log_file in log_files:
+        typer.echo(f"  - {log_file}")
+    
+    typer.echo(f"Output directory: {output_dir}")
+    
+    # Parse all log files using the multi-file parser
+    typer.echo("\nParsing log files...")
+    file_data_list = parse_multiple_log_files(log_files)
+    
+    # Check if any files have data
+    has_data = False
+    for file_data in file_data_list:
+        if file_data.response_times or file_data.error_stats.total_errors > 0:
+            has_data = True
+            break
+    
+    if not has_data:
+        typer.echo("No response time data or errors found in any log file.")
+        typer.echo("Please check the log file formats.")
+        raise typer.Exit(1)
+    
+    # Create and save charts using multi-file chart function
+    typer.echo("\nCreating charts...")
+    # Use consistent styling for all cases (simplified for better readability)
+    create_multi_file_bar_chart(file_data_list, output_dir, omit_request_count_per_bar_labels=True, 
+                               simple_title=True, publication_ready=publication_ready, 
+                               export_svg=export_svg, metric_type=metric_type_lower)
+    
+    # Print summary using multi-file summary function
+    print_multi_file_summary(file_data_list, metric_type_lower)
     
     typer.echo(f"\n✅ Analysis complete! Results saved to {output_dir}")
 
