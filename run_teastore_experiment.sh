@@ -18,22 +18,117 @@ function create_and_activate_venv_in_current_dir {
 
   # Activate the virtual environment
   source venv/bin/activate
-
-  echo "installing python requirements"
-  pip install wheel
-  pip install --upgrade pip setuptools
-  if [ -f local_requirements.txt ]; then
-    pip install -r local_requirements.txt
-  else
-    pip install -r requirements.txt
-  fi
-
   # Check if the virtual environment was activated successfully
   if [ $? -eq 0 ]; then
       echo "Virtual environment 'venv' activated successfully."
   else
       echo "Failed to activate the virtual environment 'venv'. Exiting."
       exit 2
+  fi
+
+  # Create timestamped pip install log file
+  PIP_LOG_FILE="pip_install_$(date +%Y%m%d_%H%M%S).log"
+  echo "Installing python requirements (output will be logged to $PIP_LOG_FILE)..."
+  
+  # Log pip install commands and redirect output to timestamped file
+  {
+    echo "=== PIP INSTALL LOG ==="
+    echo "Started: $(date)"
+    echo "Working directory: $(pwd)"
+    echo ""
+    
+    echo "Installing wheel..."
+    pip install wheel
+    
+    echo ""
+    echo "Upgrading pip and setuptools..."
+    pip install --upgrade pip setuptools
+    
+    echo ""
+    if [ -f local_requirements.txt ]; then
+      echo "Installing from local_requirements.txt..."
+      pip install -r local_requirements.txt
+    else
+      echo "Installing from requirements.txt..."
+      pip install -r requirements.txt
+    fi
+    
+    echo ""
+    echo "Completed: $(date)"
+    echo "=== END PIP INSTALL LOG ==="
+  } >> "$PIP_LOG_FILE" 2>&1
+  
+  echo "Python requirements installation completed. See $PIP_LOG_FILE for details."
+
+  # Check if pip installations completed successfully
+  if [ $? -eq 0 ]; then
+      echo "Virtual environment 'venv' activated and packages installed successfully."
+  else
+      echo "Failed to install Python packages. Check $PIP_LOG_FILE for details. Exiting."
+      exit 2
+  fi
+}
+
+# Function to measure TeaStore status endpoint response times
+determine_status_response_times() {
+  local cluster_ip="$1"
+  
+  echo "Measuring TeaStore status endpoint response times..."
+  local STATUS_TIMING_FILE="average_status_response_time_$(date +%Y%m%d_%H%M%S).txt"
+  
+  # Arrays to store timing data
+  local -a total_times
+  local -a connect_times
+  local -a transfer_times
+  
+  # Perform 10 timing measurements
+  for i in {1..10}; do
+    echo "  Response time measurement $i/10"
+    
+    # Use curl with timing output to measure different phases
+    local timing_output
+    timing_output=$(curl -s -f -m 10 -o /dev/null -w "total:%{time_total};connect:%{time_connect};transfer:%{time_starttransfer}" "http://$cluster_ip/tools.descartes.teastore.webui/status" 2>/dev/null)
+    local curl_exit_code=$?
+    
+    if [ $curl_exit_code -eq 0 ] && [ -n "$timing_output" ]; then
+      # Parse timing values
+      local total_time
+      local connect_time
+      local transfer_time
+      total_time=$(echo "$timing_output" | sed -n 's/.*total:\([0-9.]*\).*/\1/p')
+      connect_time=$(echo "$timing_output" | sed -n 's/.*connect:\([0-9.]*\).*/\1/p')
+      transfer_time=$(echo "$timing_output" | sed -n 's/.*transfer:\([0-9.]*\).*/\1/p')
+      
+      # Store values in arrays
+      total_times+=($total_time)
+      connect_times+=($connect_time)
+      transfer_times+=($transfer_time)
+      
+      echo "    Total: ${total_time}s, Connect: ${connect_time}s, Transfer: ${transfer_time}s"
+    else
+      echo "    Failed to get timing data (curl exit code: $curl_exit_code)"
+    fi
+    
+    # Small delay between measurements
+    sleep 0.5
+  done
+  
+  # Generate statistics and reports using Python
+  if [ ${#total_times[@]} -gt 0 ]; then
+    # Convert arrays to comma-separated strings for Python script
+    local total_csv
+    local connect_csv
+    local transfer_csv
+    total_csv=$(IFS=','; echo "${total_times[*]}")
+    connect_csv=$(IFS=','; echo "${connect_times[*]}")
+    transfer_csv=$(IFS=','; echo "${transfer_times[*]}")
+    
+    local endpoint="http://$cluster_ip/tools.descartes.teastore.webui/status"
+    
+    python calculate_response_stats.py "$total_csv" "$connect_csv" "$transfer_csv" "$endpoint" --file "$STATUS_TIMING_FILE"
+  else
+    echo "⚠ Warning: No successful timing measurements collected"
+    echo "Failed to measure response times at $(date)" > "$STATUS_TIMING_FILE"
   fi
 }
 
@@ -141,6 +236,9 @@ if [ "$teastore_with_additional_custom_resource_configurations" = true ]; then
   # Check if the custom tfvars file exists
   if [ -f "experiment/${custom_tfvars_file}.tfvars" ]; then
     ./deploy.sh --additional-var-file "experiment/${custom_tfvars_file}.tfvars" "$deployment_type"
+    # Append custom tfvars file to deployment type for directory naming
+    deployment_type="${deployment_type}-${custom_tfvars_file}"
+    echo "Updated deployment type with custom configuration: $deployment_type"
   else
     echo "Error: Custom tfvars file 'experiment/${custom_tfvars_file}.tfvars' not found"
     echo "Available files in terraform_teastore/experiment/:"
@@ -196,7 +294,7 @@ experiment_dir=$(find . -maxdepth 1 -type d -name "experiment_$(date +%Y-%m-%d)*
 echo "Using experiment directory: $experiment_dir"
 
 training_experiment_directory="$root_folder/$experiment_dir/Training_Data"
-baseline_experiment_directory="$root_folder/$experiment_dir/Baseline_Data"
+baseline_experiment_directory="$root_folder/$experiment_dir/Baseline_Data/$deployment_type"
 memory_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/Memory_experiment/$deployment_type"
 cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$deployment_type"
 locust_directory="$root_folder/locust_scripts"
@@ -326,6 +424,9 @@ while [ $warmup_retry_count -lt $max_warmup_retries ] && [ "$warmup_success" = f
     echo "  Warmup completed successfully!"
   fi
 done
+
+# Measure response time performance after warmup
+determine_status_response_times "$cluster_public_ip"
 
 # Set first_iteration based on command line argument
 if [ "$skip_warmup" = true ]; then
