@@ -4,97 +4,99 @@ provisioning_cpu_load_generator = 1
 
 cpu_load_generator_resources = {
   requests = {
-    cpu = "1m"
+    cpu = "2m"
   }
   limits = null
 }
 
 # ---- teastore variables ---
 
+use_kieker = false
+
 auth_resources = {
   requests = {
-    cpu = "170m"
+    cpu = "340m"
     memory = "655Mi"
   }
   limits = {
-    cpu = "340m"
+    cpu = "680m"
     memory = "755Mi"
   }
 }
 
 db_resources = {
   requests = {
-    cpu = "1m"
+    cpu = "10m"
     memory = "194Mi"
   }
   limits = {
-    cpu = "2m"
+    cpu = "400m"
     memory = "294Mi"
   }
 }
 
 image_resources = {
   requests = {
-    cpu = "58m"
-    memory = "773Mi"
+    cpu = "232m"
+    memory = "800Mi"
   }
   limits = {
-    cpu = "116m"
-    memory = "873Mi"
+    cpu = "564m"
+    memory = "1000Mi"
   }
 }
 
 persistence_resources = {
   requests = {
-    cpu = "10m"
+    cpu = "240m"
     memory = "707Mi"
   }
   limits = {
-    cpu = "20m"
-    memory = "807Mi"
+    cpu = "720m"
+    memory = "900Mi"
   }
 }
 
 rabbitmq_resources = {
   requests = {
-    cpu = "8m"
+    cpu = "100m"
     memory = "463Mi"
   }
   limits = {
-    cpu = "16m"
+    cpu = "600m"
     memory = "563Mi"
   }
 }
 
 recommender_resources = {
   requests = {
-    cpu = "80m"
+    cpu = "320m"
     memory = "715Mi"
   }
   limits = {
-    cpu = "160m"
+    cpu = "960m"
     memory = "815Mi"
   }
 }
 
 registry_resources = {
   requests = {
-    cpu = "42m"
+    cpu = "84m"
     memory = "328Mi"
   }
   limits = {
-    cpu = "84m"
+    cpu = "252m"
     memory = "428Mi"
   }
 }
 
 webui_resources = {
   requests = {
-    cpu = "216m"
+    cpu = "432m"
     memory = "1100Mi"
   }
   limits = {
-    cpu = "638m"
+    cpu = "1276m"
     memory = "1600Mi"
   }
 }
