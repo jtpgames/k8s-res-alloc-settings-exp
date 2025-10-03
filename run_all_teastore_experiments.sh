@@ -228,7 +228,7 @@ overall_start_time=$(date +%s)
 echo "Starting TeaStore experiments with sets: ${experiment_sets[*]} at $(date)"
 echo ""
 
-# Function to discover ts_webui_*.tfvars files and add corresponding experiments
+# Function to discover ts_*.tfvars files and add corresponding experiments
 add_custom_webui_experiments() {
     local tfvars_dir="terraform_teastore/experiment"
     
@@ -237,16 +237,16 @@ add_custom_webui_experiments() {
         return
     fi
     
-    # Find all ts_webui_*.tfvars files
+    # Find all ts_*.tfvars files
     local tfvars_files
-    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_webui_*.tfvars" -type f -exec basename {} \; | sort)
+    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_*.tfvars" -type f -exec basename {} \; | sort)
     
     if [ ${#tfvars_files[@]} -eq 0 ]; then
-        echo "Warning: No ts_webui_*.tfvars files found in $tfvars_dir. Skipping Custom-WebUI-Resources experiments."
+        echo "Warning: No ts_*.tfvars files found in $tfvars_dir. Skipping Custom-WebUI-Resources experiments."
         return
     fi
     
-    echo "Found ${#tfvars_files[@]} ts_webui_*.tfvars files:"
+    echo "Found ${#tfvars_files[@]} ts_*.tfvars files:"
     for tfvars_file in "${tfvars_files[@]}"; do
         echo "  - $tfvars_file"
         # Remove the .tfvars extension for the experiment name
@@ -337,7 +337,7 @@ fi
 for experiment in "${!experiments_to_run[@]}"; do
     if [[ "$experiment" == "Baseline (custom "* ]]; then
         # Extract the tfvars filename from the experiment name
-        # Format: "Baseline (custom ts_webui_with_request_limit)" -> "ts_webui_with_request_limit"
+        # Format: "Baseline (custom ts_with_request_limit)" -> "ts_with_request_limit"
         tfvars_name=${experiment#"Baseline (custom "}
         tfvars_name=${tfvars_name%")"}
         
@@ -392,7 +392,7 @@ all_possible_experiments=("Training" "Baseline" \
 # Add dynamically discovered Custom-WebUI-Resources experiments to the list
 tfvars_dir="terraform_teastore/experiment"
 if [ -d "$tfvars_dir" ]; then
-    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_webui_*.tfvars" -type f -exec basename {} \; | sort)
+    readarray -t tfvars_files < <(find "$tfvars_dir" -name "ts_*.tfvars" -type f -exec basename {} \; | sort)
     for tfvars_file in "${tfvars_files[@]}"; do
         experiment_name="${tfvars_file%.tfvars}"
         all_possible_experiments+=("Baseline (custom $experiment_name)")
