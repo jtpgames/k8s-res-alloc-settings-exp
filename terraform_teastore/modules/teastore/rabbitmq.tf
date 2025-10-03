@@ -1,4 +1,5 @@
 resource "kubernetes_deployment_v1" "rabbitmq" {
+  count = var.use_kieker ? 1 : 0
   depends_on = [kubernetes_default_service_account_v1.teastore]
 
   metadata {
@@ -66,6 +67,7 @@ resource "kubernetes_deployment_v1" "rabbitmq" {
 }
 
 resource "kubernetes_service" "rabbitmq" {
+  count = var.use_kieker ? 1 : 0
   depends_on = [kubernetes_deployment_v1.rabbitmq]
 
   metadata {

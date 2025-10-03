@@ -50,9 +50,12 @@ resource "kubernetes_deployment_v1" "recommender" {
             value = "registry-svc"
           }
 
-          env {
-            name  = "RABBITMQ_HOST"
-            value = "rabbitmq-svc"
+          dynamic "env" {
+            for_each = var.use_kieker ? [1] : []
+            content {
+              name  = "RABBITMQ_HOST"
+              value = "rabbitmq-svc"
+            }
           }
 
           dynamic "resources" {

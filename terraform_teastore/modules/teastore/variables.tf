@@ -7,6 +7,12 @@ variable "node" {
   type        = string
 }
 
+variable "use_kieker" {
+  description = "Enable Kieker monitoring with RabbitMQ. When false, RabbitMQ deployment and RABBITMQ_HOST env var are omitted."
+  type        = bool
+  default     = true
+}
+
 variable "image_registry" {
   type = object({
     url                      = string

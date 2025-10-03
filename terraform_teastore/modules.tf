@@ -35,6 +35,7 @@ module "teastore" {
   recommender_resources = var.recommender_resources
   registry_resources = var.registry_resources
   webui_resources = var.webui_resources
+  use_kieker = var.use_kieker
 }
 
 module "noisy-neighbor" {
