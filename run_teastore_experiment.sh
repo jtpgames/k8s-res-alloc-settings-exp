@@ -134,6 +134,7 @@ determine_status_response_times() {
 
 # Parse command line arguments
 skip_warmup=false
+only_warmup=false
 experiment_type="training"  # default to training
 teastore_with_resource_configurations=false
 teastore_with_additional_custom_resource_configurations=false
@@ -144,6 +145,10 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --skip-warmup)
       skip_warmup=true
+      shift # past argument
+      ;;
+    --only-warmup)
+      only_warmup=true
       shift # past argument
       ;;
     --ts-with-res-conf)
@@ -179,6 +184,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
       echo "  --skip-warmup               Skip the warmup phase"
+      echo "  --only-warmup               Only perform warmup phase and exit (skips load tests)"
       echo "  --ts-with-res-conf          Start TeaStore with resource allocation configurations"
       echo "  --ts-with-custom-res-conf FILE  Start TeaStore with custom resource configurations from FILE.tfvars in terraform_teastore/experiment/"
       echo "  --experiment-type TYPE      Specify experiment type: training (default), baseline, memory-noisy-neighbor, cpu-noisy-neighbor"
@@ -427,6 +433,12 @@ done
 
 # Measure response time performance after warmup
 determine_status_response_times "$cluster_public_ip"
+
+# Check if only warmup was requested
+if [ "$only_warmup" = true ]; then
+  echo "Only warmup requested (--only-warmup flag provided). Exiting after warmup completion."
+  exit 0
+fi
 
 # Set first_iteration based on command line argument
 if [ "$skip_warmup" = true ]; then
