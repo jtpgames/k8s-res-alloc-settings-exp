@@ -342,7 +342,7 @@ kubectl get events -n noisy-neighbor --sort-by=.metadata.creationTimestamp \
 
 echo "\nChecking teastore namespace events:"
 kubectl get events -n teastore --sort-by=.metadata.creationTimestamp \
-  | grep -Ei "evict|oomkill|oomkilled|outofmemory" || echo "No relevant events found in teastore namespace during experiment"
+  | grep -Ei "evict|oomkill|oomkilled|outofmemory|backoff" || echo "No relevant events found in teastore namespace during experiment"
 
 # Also show all recent events for broader context (without grep filter)
 echo "\nAll recent events (noisy-neighbor):"
