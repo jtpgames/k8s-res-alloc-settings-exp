@@ -280,6 +280,7 @@ for experiment_set in "${experiment_sets[@]}"; do
             ;;
         "Applied-Guidelines")
             experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts with res conf, nn with res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
             ;;
         "Custom-WebUI-Resources")
@@ -290,6 +291,7 @@ for experiment_set in "${experiment_sets[@]}"; do
             experiments_to_run["CPU Noisy Neighbor (ts without res conf)"]=1
             experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]=1
             experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]=1
+            experiments_to_run["CPU Noisy Neighbor (ts with res conf, nn with res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts without res conf)"]=1
             experiments_to_run["Memory Noisy Neighbor (ts with res conf)"]=1
             add_custom_webui_experiments
@@ -318,6 +320,9 @@ fi
 if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts without res conf, nn with res conf)"]}" ]]; then
     run_experiment_with_timing "CPU Noisy Neighbor (ts without res conf, nn with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-custom-res-conf cpu_load_generator_resources
 fi
+if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts with res conf, nn with res conf)"]}" ]]; then
+    run_experiment_with_timing "CPU Noisy Neighbor (ts with res conf, nn with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-custom-res-conf cpu_load_generator_with_resources_teastore_with_resources
+fi
 if [[ -n "${experiments_to_run["CPU Noisy Neighbor (ts with res conf)"]}" ]]; then
     run_experiment_with_timing "CPU Noisy Neighbor (ts with res conf)" --experiment-type cpu-noisy-neighbor --ts-with-res-conf
 fi
@@ -336,7 +341,12 @@ for experiment in "${!experiments_to_run[@]}"; do
         tfvars_name=${experiment#"Baseline (custom "}
         tfvars_name=${tfvars_name%")"}
         
-        run_experiment_with_timing "$experiment" --experiment-type baseline --ts-with-custom-res-conf "$tfvars_name"
+        # Check if tfvars_name contains "_nn_" (noisy neighbor)
+        if [[ "$tfvars_name" == *"_nn_"* ]]; then
+            run_experiment_with_timing "$experiment" --experiment-type cpu-noisy-neighbor --ts-with-custom-res-conf "$tfvars_name"
+        else
+            run_experiment_with_timing "$experiment" --experiment-type baseline --ts-with-custom-res-conf "$tfvars_name"
+        fi
     fi
 done
 
@@ -371,7 +381,13 @@ for experiment in "${experiments_run[@]}"; do
 done
 
 # Build list of all possible experiments (including dynamically discovered ones)
-all_possible_experiments=("Training" "Baseline" "CPU Noisy Neighbor (ts without res conf)" "CPU Noisy Neighbor (ts without res conf, nn with res conf)" "CPU Noisy Neighbor (ts with res conf)" "Memory Noisy Neighbor (ts without res conf)" "Memory Noisy Neighbor (ts with res conf)")
+all_possible_experiments=("Training" "Baseline" \
+  "CPU Noisy Neighbor (ts without res conf)" \
+  "CPU Noisy Neighbor (ts without res conf, nn with res conf)" \
+  "CPU Noisy Neighbor (ts with res conf)" \
+  "CPU Noisy Neighbor (ts with res conf, nn with res conf)" \
+  "Memory Noisy Neighbor (ts without res conf)" \
+  "Memory Noisy Neighbor (ts with res conf)")
 
 # Add dynamically discovered Custom-WebUI-Resources experiments to the list
 tfvars_dir="terraform_teastore/experiment"
