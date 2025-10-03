@@ -58,8 +58,12 @@ resource "kubernetes_deployment_v1" "recommender" {
           dynamic "resources" {
             for_each = var.recommender_resources.requests != null || var.recommender_resources.limits != null ? [1] : []
             content {
-              limits   = var.recommender_resources.limits
-              requests = var.recommender_resources.requests
+              limits = var.recommender_resources.limits != null ? {
+                for k, v in var.recommender_resources.limits : k => v if v != null
+              } : null
+              requests = var.recommender_resources.requests != null ? {
+                for k, v in var.recommender_resources.requests : k => v if v != null
+              } : null
             }
           }
         }

@@ -43,8 +43,12 @@ resource "kubernetes_deployment_v1" "db" {
           dynamic "resources" {
             for_each = var.db_resources.requests != null || var.db_resources.limits != null ? [1] : []
             content {
-              limits   = var.db_resources.limits
-              requests = var.db_resources.requests
+              limits = var.db_resources.limits != null ? {
+                for k, v in var.db_resources.limits : k => v if v != null
+              } : null
+              requests = var.db_resources.requests != null ? {
+                for k, v in var.db_resources.requests : k => v if v != null
+              } : null
             }
           }
         }

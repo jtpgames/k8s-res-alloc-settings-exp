@@ -16,85 +16,92 @@ variable "image_registry" {
 
 variable "rabbitmq_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "registry_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "db_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "persistence_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "auth_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "image_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 
 variable "recommender_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
 }
 

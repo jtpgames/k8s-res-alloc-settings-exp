@@ -58,8 +58,12 @@ resource "kubernetes_deployment_v1" "auth" {
           dynamic "resources" {
             for_each = var.auth_resources.requests != null || var.auth_resources.limits != null ? [1] : []
             content {
-              limits   = var.auth_resources.limits
-              requests = var.auth_resources.requests
+              limits = var.auth_resources.limits != null ? {
+                for k, v in var.auth_resources.limits : k => v if v != null
+              } : null
+              requests = var.auth_resources.requests != null ? {
+                for k, v in var.auth_resources.requests : k => v if v != null
+              } : null
             }
           }
         }

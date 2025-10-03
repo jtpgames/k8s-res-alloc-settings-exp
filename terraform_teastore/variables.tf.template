@@ -39,13 +39,14 @@ variable "cpu_load_generator_resources" {
 
 variable "rabbitmq_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -55,13 +56,14 @@ variable "rabbitmq_resources" {
 
 variable "registry_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -71,13 +73,14 @@ variable "registry_resources" {
 
 variable "db_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -87,13 +90,14 @@ variable "db_resources" {
 
 variable "persistence_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -103,13 +107,14 @@ variable "persistence_resources" {
 
 variable "auth_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -119,13 +124,14 @@ variable "auth_resources" {
 
 variable "image_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null
@@ -135,13 +141,14 @@ variable "image_resources" {
 
 variable "recommender_resources" {
   type = object({
-    limits = object({
-      memory = string
-    })
-    requests = object({
-      cpu = string
-      memory = string
-    })
+    limits = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
+    requests = optional(object({
+      cpu = optional(string)
+      memory = optional(string)
+    }))
   })
   default = {
     limits = null

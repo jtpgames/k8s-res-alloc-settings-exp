@@ -49,8 +49,12 @@ resource "kubernetes_deployment_v1" "rabbitmq" {
           dynamic "resources" {
             for_each = var.rabbitmq_resources.requests != null || var.rabbitmq_resources.limits != null ? [1] : []
             content {
-              limits   = var.rabbitmq_resources.limits
-              requests = var.rabbitmq_resources.requests
+              limits = var.rabbitmq_resources.limits != null ? {
+                for k, v in var.rabbitmq_resources.limits : k => v if v != null
+              } : null
+              requests = var.rabbitmq_resources.requests != null ? {
+                for k, v in var.rabbitmq_resources.requests : k => v if v != null
+              } : null
             }
           }
         }
