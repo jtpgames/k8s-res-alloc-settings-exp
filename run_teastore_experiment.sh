@@ -306,8 +306,13 @@ cpu_noisy_neighbor_experiment_dir="$root_folder/$experiment_dir/CPU_experiment/$
 locust_directory="$root_folder/locust_scripts"
 
 echo "Current time: $(date +'%H:%M:%S')"
-echo "Waiting for 120 seconds for TeaStore to start up"
-sleep 120
+if [ "$teastore_with_additional_custom_resource_configurations" = true ]; then
+  echo "Waiting for 240 seconds for TeaStore to start up"
+  sleep 240
+else
+  echo "Waiting for 120 seconds for TeaStore to start up"
+  sleep 120
+fi
 
 # Retry TeaStore status request until all services are OK
 max_retries=20
