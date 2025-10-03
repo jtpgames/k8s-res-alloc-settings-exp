@@ -278,7 +278,7 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             'axes.labelsize': 14,
             'xtick.labelsize': 12,
             'ytick.labelsize': 12,
-            'legend.fontsize': 12,
+            'legend.fontsize': 14,
             'font.family': 'serif',
             'font.serif': ['Times', 'Times New Roman', 'DejaVu Serif'],
             'mathtext.fontset': 'dejavuserif',
@@ -408,11 +408,13 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
         ax1.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
 
-        # Add vertical headroom so legend does not overlap tallest bars
-        ax1.margins(y=0.50)
+        # Add significant vertical headroom to accommodate legend at top of chart
+        ax1.margins(y=0.5)
         
-        # Improve legend positioning
-        ax1.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
+        # Horizontal legend pushed higher within the chart area in two rows (max 3 items per row)
+        ncols = min(len(file_data_list), 3)  # Max 3 items per row
+        ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=ncols, 
+                  frameon=True, fancybox=True, shadow=False)
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
@@ -451,15 +453,13 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 hatch = hatch_patterns[i % len(hatch_patterns)]
                 edge_width = 1.0 if publication_ready else 0.5
                 
-                # Use professional color palette for error types
-                error_colors = ['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
-                if len(all_error_types) > 8:
-                    error_colors = plt.colormaps['tab10'](np.linspace(0, 1, len(all_error_types)))
+                # Use the same color as the response time chart for this file (consistent across both charts)
+                color_to_use = colors[i]
                 
-                # For error bars, we'll use the same color for each error type but different textures for files
+                # For error bars, use the same color for each file (matching response time chart)
                 bars = ax2.bar(error_x_positions + i * error_bar_width, file_error_counts, 
                               error_bar_width, label=file_data.file_label,
-                              color=error_colors[:len(all_error_types)], alpha=0.8, 
+                              color=color_to_use, alpha=0.8, 
                               hatch=hatch, edgecolor='black', linewidth=edge_width)
                 
                 # Add value labels on bars (only for non-zero values, omit in publication mode)
@@ -486,19 +486,21 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
             ax2.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
             
-            # Add vertical headroom so legend does not overlap tallest bars
-            ax2.margins(y=0.15)
+            # Add significant vertical headroom to accommodate legend at top of chart
+            ax2.margins(y=0.5)
 
-            # Improve legend positioning
-            ax2.legend(loc='upper right', frameon=True, fancybox=True, shadow=False)
+            # Horizontal legend pushed higher within the chart area in two rows (consistent with response time chart)
+            ncols = min(len(file_data_list), 3)  # Max 3 items per row
+            ax2.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=ncols, 
+                      frameon=True, fancybox=True, shadow=False)
     
-    # Optimize spacing between subplots for better readability (only if we have multiple subplots)
+    # Optimize spacing between subplots for better readability (legends now within chart area)
     if has_errors:
         if publication_ready:
-            plt.subplots_adjust(hspace=0.5)  # More space for publication
-            plt.tight_layout(pad=1.5)  # More padding for cleaner look
+            plt.subplots_adjust(hspace=0.6)  # Space for publication layout
+            plt.tight_layout(pad=1.5)
         else:
-            plt.subplots_adjust(hspace=0.4)
+            plt.subplots_adjust(hspace=0.5)  # Standard space between subplots
             plt.tight_layout(pad=1.0)
     else:
         # Single subplot, just use tight_layout
