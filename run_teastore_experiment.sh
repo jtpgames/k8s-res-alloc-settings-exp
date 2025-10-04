@@ -358,83 +358,131 @@ done
 # this is just a start, because we observed that sometimes the load balancer of TeaStore gets stuck.
 echo "Sending curl requests to teastore to warm it up ..."
 
-# Retry the entire warmup sequence if any curl request fails
-max_warmup_retries=5
-warmup_retry_count=0
-warmup_success=false
-
-while [ $warmup_retry_count -lt $max_warmup_retries ] && [ "$warmup_success" = false ]; do
-  echo "Warmup attempt $((warmup_retry_count + 1))/$max_warmup_retries"
-  warmup_failed=false
+# Function to execute parallel curl requests for a given endpoint
+run_parallel_warmup_requests() {
+  local endpoint="$1"
+  local endpoint_name="$2"
   
-  for i in {1..5}; do
-    echo "  Warmup request $i/5"
-    
-    # Test each endpoint and break the loop if any fails
+  parallel_request=10
 
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: status endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
-    
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: home endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
-    
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/login"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: login endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
-    
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: category endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
-    
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: product endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
-    
-    curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/profile"
-    if [ $? -ne 0 ]; then
-      echo "    Failed: profile endpoint"
-      warmup_failed=true
-      break
-    fi
-    sleep 0.1
+  echo "    Running $parallel_request parallel requests to $endpoint_name endpoint"
+
+  # Start parallel curl requests in background
+  for j in {1..$parallel_request}; do
+    curl -s -f -m 10 -o /dev/null "$endpoint" &
   done
   
-  if [ "$warmup_failed" = true ]; then
-    warmup_retry_count=$((warmup_retry_count + 1))
-    if [ $warmup_retry_count -lt $max_warmup_retries ]; then
-      echo "  Warmup failed, retrying in 3 seconds..."
-      sleep 3
+  # Wait for all background processes to complete
+  wait
+  echo "    Completed $parallel_request parallel requests to $endpoint_name endpoint"
+}
+
+# Check if we're in only-warmup mode for enhanced parallel warmup
+if [ "$only_warmup" = true ]; then
+  echo "Enhanced parallel warmup mode (10 parallel requests per endpoint)"
+  
+  for i in {1..5}; do
+    echo "  Warmup iteration $i/5"
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/status" "status"
+    sleep 0.2
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/" "home"
+    sleep 0.2
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/login" "login"
+    sleep 0.2
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1" "category"
+    sleep 0.2
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7" "product"
+    sleep 0.2
+    
+    run_parallel_warmup_requests "http://$cluster_public_ip/tools.descartes.teastore.webui/profile" "profile"
+    sleep 0.2
+  done
+  
+  echo "  Enhanced parallel warmup completed successfully!"
+else
+  # Original warmup logic with retry mechanism for non-only-warmup mode
+  max_warmup_retries=5
+  warmup_retry_count=0
+  warmup_success=false
+
+  while [ $warmup_retry_count -lt $max_warmup_retries ] && [ "$warmup_success" = false ]; do
+    echo "Warmup attempt $((warmup_retry_count + 1))/$max_warmup_retries"
+    warmup_failed=false
+    
+    for i in {1..5}; do
+      echo "  Warmup request $i/5"
+      
+      # Test each endpoint and break the loop if any fails
+
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/status"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: status endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+      
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: home endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+      
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/login"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: login endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+      
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/category?category=2&page=1"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: category endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+      
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/product?id=7"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: product endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+      
+      curl -s -f -m 10 -o /dev/null "http://$cluster_public_ip/tools.descartes.teastore.webui/profile"
+      if [ $? -ne 0 ]; then
+        echo "    Failed: profile endpoint"
+        warmup_failed=true
+        break
+      fi
+      sleep 0.1
+    done
+    
+    if [ "$warmup_failed" = true ]; then
+      warmup_retry_count=$((warmup_retry_count + 1))
+      if [ $warmup_retry_count -lt $max_warmup_retries ]; then
+        echo "  Warmup failed, retrying in 3 seconds..."
+        sleep 3
+      else
+        echo "Error: Warmup failed after $max_warmup_retries attempts"
+        exit 1
+      fi
     else
-      echo "Error: Warmup failed after $max_warmup_retries attempts"
-      exit 1
+      warmup_success=true
+      echo "  Warmup completed successfully!"
     fi
-  else
-    warmup_success=true
-    echo "  Warmup completed successfully!"
-  fi
-done
+  done
+fi
 
 # Measure response time performance after warmup
 determine_status_response_times "$cluster_public_ip"
