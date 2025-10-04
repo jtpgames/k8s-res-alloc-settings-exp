@@ -67,9 +67,9 @@ registry_resources = {
 
 webui_resources = {
   requests = {
-    memory = "1100Mi"
+    memory = "930Mi"
   }
   limits = {
-    memory = "1100Mi"
+    memory = "930Mi"
   }
 }

@@ -20,7 +20,7 @@ auth_resources = {
   }
   limits = {
     cpu = "680m"
-    memory = "755Mi"
+    memory = "800Mi"
   }
 }
 
