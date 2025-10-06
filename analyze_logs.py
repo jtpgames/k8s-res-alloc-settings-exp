@@ -587,20 +587,40 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
     # plt.show()
 
 
+def _get_subplot_position_info(subplot_index: int, rows: int, cols: int) -> dict:
+    """Helper function to determine position of subplot in grid."""
+    row = subplot_index // cols
+    col = subplot_index % cols
+    
+    return {
+        'row': row,
+        'col': col,
+        'is_top_row': row == 0,
+        'is_bottom_row': row == rows - 1,
+        'is_left_col': col == 0,
+        'is_right_col': col == cols - 1
+    }
+
+
 def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
                         publication_ready: bool = False,
                         export_svg: bool = False):
-    """Create and save scatter/line plots for response times over relative time."""
+    """Create and save scatter/line plots for response times over relative time.
     
+    Optimizes subplot axes by hiding:
+    - X-axis labels and ticks for plots in the top rows
+    - Y-axis labels and ticks for plots in the rightmost columns
+    """
+   
     # Set publication-ready styling
     if publication_ready:
         plt.rcParams.update({
-            'font.size': 12,  # Slightly smaller for subplots
-            'axes.titlesize': 14,
-            'axes.labelsize': 12,
-            'xtick.labelsize': 10,
-            'ytick.labelsize': 10,
-            'legend.fontsize': 10,
+            'font.size': 16,
+            'axes.titlesize': 16,
+            'axes.labelsize': 16,
+            'xtick.labelsize': 14,
+            'ytick.labelsize': 14,
+            'legend.fontsize': 12,
             'font.family': 'serif',
             'font.serif': ['Times', 'Times New Roman', 'DejaVu Serif'],
             'mathtext.fontset': 'dejavuserif',
@@ -660,10 +680,23 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
             
         ax = axes[i]
         
+        # Get position information for this subplot
+        pos_info = _get_subplot_position_info(i, rows, cols)
+        
         if not file_data.response_timestamps:
             ax.text(0.5, 0.5, 'No data available', ha='center', va='center', 
-                   transform=ax.transAxes, fontsize=12)
-            ax.set_title(file_data.file_label, fontweight='bold', fontsize=12)
+                   transform=ax.transAxes)
+            # Place title inside the plot area instead of above
+            ax.text(0.02, 0.98, file_data.file_label, transform=ax.transAxes, 
+                   fontweight='bold', verticalalignment='top',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+            
+            # Apply axis hiding logic even for empty plots
+            if not pos_info['is_bottom_row']:
+                ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+            if not pos_info['is_left_col']:
+                ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+            
             continue
         
         # Plot each request type with different colors
@@ -694,21 +727,34 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
                                      color='red', marker='x', s=30, alpha=0.8)
             legend_elements.append((error_scatter, 'Errors'))
         
-        # Formatting for each subplot
-        ax.set_xlabel('Time (seconds from start)', fontsize=10)
-        ax.set_ylabel('Response Time (ms)', fontsize=10)
-        ax.set_title(file_data.file_label, fontweight='bold', fontsize=12)
+        # Formatting for each subplot with optimized axis labels
+        # Only show x-axis labels for bottom row
+        if pos_info['is_bottom_row']:
+            ax.set_xlabel('Time (seconds from start)')
+        else:
+            ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        
+        # Only show y-axis labels for left column
+        if pos_info['is_left_col']:
+            ax.set_ylabel('Response Time (ms)')
+        else:
+            ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+        
+        # Place title inside the plot area instead of above
+        ax.text(0.02, 0.98, file_data.file_label, transform=ax.transAxes, 
+               fontweight='bold', verticalalignment='top',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
         
-        # Set consistent y-axis range
+        # Set consistent y-axis range with extra headroom for title
         if global_max_time > 0:
-            ax.set_ylim(0, global_max_time * 1.2)
+            ax.set_ylim(0, global_max_time * 1.35)  # Increased from 1.2 to 1.35 for title space
         
         # Add legend only if we have data
         if legend_elements:
             labels = [elem[1] for elem in legend_elements]
             handles = [elem[0] for elem in legend_elements]
-            ax.legend(handles, labels, loc='upper right', fontsize=8, frameon=True)
+            ax.legend(handles, labels, loc='upper right', frameon=True)
     
     # Hide unused subplots
     for i in range(num_files, len(axes)):
@@ -718,11 +764,15 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
     # if num_files > 1:
     #     fig.suptitle('Response Times Over Time - Multiple Files', fontsize=16, fontweight='bold')
     
-    # Adjust layout to prevent overlap
+    # Adjust layout with minimal padding between subplots
     if num_files > 1:
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Leave space for suptitle
+        # Use subplots_adjust for more precise control over spacing
+        plt.subplots_adjust(hspace=0.0, wspace=0.0)  # Zero vertical and horizontal spacing
+        # Apply tight_layout first, then override with subplots_adjust for final control
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95], pad=0.1)
+        plt.subplots_adjust(hspace=0.0, wspace=0.0)  # Reapply to ensure zero spacing
     else:
-        plt.tight_layout()
+        plt.tight_layout(pad=0.1)  # Minimal padding for single subplot
     
     # Generate output filename
     if len(file_data_list) == 1:
