@@ -315,11 +315,11 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
     # Set publication-ready styling
     if publication_ready:
         plt.rcParams.update({
-            'font.size': 14,
+            'font.size': 16,
             'axes.titlesize': 16,
-            'axes.labelsize': 14,
-            'xtick.labelsize': 12,
-            'ytick.labelsize': 12,
+            'axes.labelsize': 18,
+            'xtick.labelsize': 16,
+            'ytick.labelsize': 16,
             'legend.fontsize': 14,
             'font.family': 'serif',
             'font.serif': ['Times', 'Times New Roman', 'DejaVu Serif'],
@@ -444,7 +444,11 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             title_suffix = f"\n({title_suffix})"
         else:
             title_suffix = ""
-        ax1.set_title(f'{metric_type.title()} Response Times per Request Type {title_suffix}')
+        # Place title inside the plot area instead of above
+        title_text = f'{metric_type.title()} Response Times per Request Type {title_suffix}'
+        ax1.text(0.02, 0.98, title_text, transform=ax1.transAxes, 
+               fontweight='bold', verticalalignment='top',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         
         ax1.set_xticks(x_positions + bar_width * (len(file_data_list) - 1) / 2)
         ax1.set_xticklabels(all_request_types, rotation=45, ha='right')
@@ -453,14 +457,18 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
         # Add significant vertical headroom to accommodate legend at top of chart
         ax1.margins(y=0.5)
         
-        # Horizontal legend pushed higher within the chart area in two rows (max 3 items per row)
-        ncols = min(len(file_data_list), 3)  # Max 3 items per row
-        ax1.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=ncols, 
+        # Horizontal legend positioned at right corner intersecting with chart border
+        ncols = min(len(file_data_list), 3)  # Max 3 items per row for horizontal layout
+        ax1.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), ncol=ncols, 
                   frameon=True, fancybox=True, shadow=False)
     else:
         ax1.text(0.5, 0.5, 'No response time data found', 
                 ha='center', va='center', transform=ax1.transAxes)
-        ax1.set_title(f'{metric_type.title()} Response Times per Request Type - Multiple Files')
+        # Place title inside the plot area instead of above
+        title_text = f'{metric_type.title()} Response Times per Request Type - Multiple Files'
+        ax1.text(0.02, 0.98, title_text, transform=ax1.transAxes, 
+               fontweight='bold', verticalalignment='top',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
     
     # Plot 2: Error Breakdown by Type (Per File with Textures) - Only if there are errors
     if has_errors:
@@ -522,7 +530,11 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
                 error_title_suffix = f"\n({error_title_suffix})"
             else:
                 error_title_suffix = ""
-            ax2.set_title(f'Error Breakdown by Type per Error Type {error_title_suffix}')
+            # Place title inside the plot area instead of above
+            error_title_text = f'Error Breakdown by Type per Error Type {error_title_suffix}'
+            ax2.text(0.02, 0.98, error_title_text, transform=ax2.transAxes, 
+                   fontweight='bold', verticalalignment='top',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
             
             ax2.set_xticks(error_x_positions + error_bar_width * (len(file_data_list) - 1) / 2)
             ax2.set_xticklabels(all_error_types, rotation=45, ha='right')
@@ -531,9 +543,9 @@ def create_multi_file_bar_chart(file_data_list: List[FileData], output_dir: Path
             # Add significant vertical headroom to accommodate legend at top of chart
             ax2.margins(y=0.5)
 
-            # Horizontal legend pushed higher within the chart area in two rows (consistent with response time chart)
-            ncols = min(len(file_data_list), 3)  # Max 3 items per row
-            ax2.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=ncols, 
+            # Horizontal legend positioned at right corner intersecting with chart border (consistent with response time chart)
+            ncols = min(len(file_data_list), 3)  # Max 3 items per row for horizontal layout
+            ax2.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), ncol=ncols, 
                       frameon=True, fancybox=True, shadow=False)
     
     # Optimize spacing between subplots for better readability (legends now within chart area)
@@ -615,11 +627,11 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
     # Set publication-ready styling
     if publication_ready:
         plt.rcParams.update({
-            'font.size': 16,
-            'axes.titlesize': 16,
-            'axes.labelsize': 16,
-            'xtick.labelsize': 14,
-            'ytick.labelsize': 14,
+            'font.size': 18,
+            'axes.titlesize': 18,
+            'axes.labelsize': 18,
+            'xtick.labelsize': 16,
+            'ytick.labelsize': 16,
             'legend.fontsize': 12,
             'font.family': 'serif',
             'font.serif': ['Times', 'Times New Roman', 'DejaVu Serif'],
