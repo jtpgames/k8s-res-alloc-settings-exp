@@ -177,6 +177,11 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats,
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             for line_num, line in enumerate(file, 1):
+                if not warmup_finished:
+                    if warmup_pattern.search(line):
+                        warmup_finished = True
+                    continue
+
                 # Extract timestamp from every line
                 timestamp_match = timestamp_pattern.search(line)
                 current_timestamp = None
@@ -184,11 +189,6 @@ def parse_log_file(file_path: Path) -> Tuple[Dict[str, List[float]], ErrorStats,
                     current_timestamp = parse_timestamp(timestamp_match.group(1))
                     if start_time is None:
                         start_time = current_timestamp
-                
-                if not warmup_finished:
-                    if warmup_pattern.search(line):
-                        warmup_finished = True
-                    continue
 
                 # Check for response time entries
                 response_match = response_pattern.search(line)
@@ -689,6 +689,7 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
         if file_data.error_timestamps:
             # Use a high value for error visualization
             error_response_times = [global_max_time * 1.1] * len(file_data.error_timestamps)
+            # error_response_times = [0] * len(file_data.error_timestamps)
             error_scatter = ax.scatter(file_data.error_timestamps, error_response_times, 
                                      color='red', marker='x', s=30, alpha=0.8)
             legend_elements.append((error_scatter, 'Errors'))
@@ -713,9 +714,9 @@ def create_scatter_plot(file_data_list: List[FileData], output_dir: Path,
     for i in range(num_files, len(axes)):
         axes[i].set_visible(False)
     
-    # Add overall title
-    if num_files > 1:
-        fig.suptitle('Response Times Over Time - Multiple Files', fontsize=16, fontweight='bold')
+    # # Add overall title
+    # if num_files > 1:
+    #     fig.suptitle('Response Times Over Time - Multiple Files', fontsize=16, fontweight='bold')
     
     # Adjust layout to prevent overlap
     if num_files > 1:
