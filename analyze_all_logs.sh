@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Simple script to find and analyze all locust_*.log files in LoadTester_Logs directories
-# Usage: ./analyze_all_logs.sh [experiment_type1] [experiment_type2] ...
+# Usage: ./analyze_all_logs.sh [--draft] [experiment_type1] [experiment_type2] ...
+# Options:
+#   --draft    Call analyze_logs.py without --publication option (for draft analysis)
 # Available experiment types:
 #   - baseline
 #   - training
@@ -9,15 +11,42 @@
 #   - CPU_experiment with_resources
 #   - Memory_experiment without_resources
 #   - Memory_experiment with_resources
-# If no arguments provided, all logs will be analyzed.
+#   - on_demand
+# If no experiment types provided, all logs will be analyzed.
 
-# Parse command line arguments for experiment type filtering
+# Parse command line arguments for options and experiment type filtering
 SPECIFIED_EXPERIMENT_TYPES=()
-if [ $# -gt 0 ]; then
-    SPECIFIED_EXPERIMENT_TYPES=("$@")
+DRAFT_MODE=false
+
+# Process arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --draft)
+            DRAFT_MODE=true
+            shift
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Usage: ./analyze_all_logs.sh [--draft] [experiment_type1] [experiment_type2] ..."
+            exit 1
+            ;;
+        *)
+            SPECIFIED_EXPERIMENT_TYPES+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [ ${#SPECIFIED_EXPERIMENT_TYPES[@]} -gt 0 ]; then
     echo "Filtering logs for specified experiment types: ${SPECIFIED_EXPERIMENT_TYPES[*]}"
 else
     echo "No experiment types specified - analyzing all available logs"
+fi
+
+if [ "$DRAFT_MODE" = true ]; then
+    echo "Draft mode enabled - will call analyze_logs.py without --publication option"
+else
+    echo "Publication mode enabled - will call analyze_logs.py with --publication option"
 fi
 echo
 
@@ -46,6 +75,7 @@ echo
 # 2. Training 
 # 3. CPU_experiment (without resources first, then with resources)
 # 4. Memory_experiment (without resources first, then with resources)
+# 5. On_demand
 sorted_log_files=()
 
 # Function to get sort priority based on file path
@@ -57,13 +87,29 @@ get_sort_priority() {
     elif [[ "$file_path" == *"Training"* ]]; then
         echo "2"
     elif [[ "$file_path" == *"cpu-without-resources"* ]]; then
+      if [[ "$file_path" == *"nn-with-resources"* ]]; then
+        echo "9"
+      else
         echo "3"
+      fi
     elif [[ "$file_path" == *"cpu-with-resources"* ]]; then
+      if [[ "$file_path" == *"nn-with-resources"* ]]; then
+        echo "9"
+      else
         echo "4"
+      fi
     elif [[ "$file_path" == *"mem-without-resources"* ]]; then
         echo "5"
     elif [[ "$file_path" == *"mem-with-resources"* ]]; then
+      if [[ "$file_path" == *"partial"* ]]; then
+        echo "7"
+      elif [[ "$file_path" == *"higher"* ]]; then
+        echo "9"
+      else
         echo "6"
+      fi
+    elif [[ "$file_path" == *"On_demand"* ]]; then
+        echo "7"
     else
         echo "9"  # Unknown files go last
     fi
@@ -85,6 +131,8 @@ get_experiment_type() {
         echo "Memory_experiment without_resources"
     elif [[ "$file_path" == *"mem-with-resources"* ]]; then
         echo "Memory_experiment with_resources"
+    elif [[ "$file_path" == *"On_demand"* ]]; then
+        echo "on_demand"
     else
         echo "unknown"
     fi
@@ -151,7 +199,11 @@ echo
 
 # Process all log files in a single call
 echo "Analyzing all log files together..."
-python analyze_logs.py "${sorted_log_files[@]}" --publication --output-dir "$OUTPUT_DIR"
+if [ "$DRAFT_MODE" = true ]; then
+    python analyze_logs.py "${sorted_log_files[@]}" --output-dir "$OUTPUT_DIR"
+else
+    python analyze_logs.py "${sorted_log_files[@]}" --publication --scatter-plot --output-dir "$OUTPUT_DIR"
+fi
 
 echo "All log files processed!"
 echo "Results saved to: $OUTPUT_DIR"
